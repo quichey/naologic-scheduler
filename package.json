@@ -4,7 +4,7 @@
   "description": "Take Home Assessment for Naologic",
   "main": "index.js",
   "scripts": {
-    "generate": "tsx src/scripts/generate-data.ts",
+    "generate": "tsx src/scripts/generateData.ts",
     "reflow": "tsx src/reflow/reflow.service.ts",
     "test": "tsx src/test.ts"
   },
