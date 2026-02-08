@@ -3,13 +3,16 @@
     "target": "esnext",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "resolveJsonModule": true,      // Needed to import your JSON test data
-    "esModuleInterop": true,         // Allows standard imports for libs like Luxon
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    /* Added Fixes Below */
+    "verbatimModuleSyntax": true,   // Forces 'import type' and explicit extensions
+    "isolatedModules": true         // Ensures compatibility with modern transpilers (like esbuild/tsx)
   },
   "include": ["src/**/*"]
 }

@@ -1,4 +1,4 @@
-import { WorkOrder, WorkCenter, ManufacturingOrder } from '../reflow/types.js';
+import type { WorkOrder, WorkCenter, ManufacturingOrder } from '../reflow/types.js';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 
