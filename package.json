@@ -1,0 +1,35 @@
+{
+  "name": "naologic-scheduler",
+  "version": "1.0.0",
+  "description": "Take Home Assessment for Naologic",
+  "main": "index.js",
+  "scripts": {
+    "generate": "tsx src/scripts/generate-data.ts",
+    "reflow": "tsx src/reflow/reflow.service.ts",
+    "test": "tsx src/test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quichey/naologic-scheduler.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/quichey/naologic-scheduler/issues"
+  },
+  "homepage": "https://github.com/quichey/naologic-scheduler#readme",
+  "devDependencies": {
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^25.2.2",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "luxon": "^3.7.2",
+    "uuid": "^13.0.0"
+  }
+}
