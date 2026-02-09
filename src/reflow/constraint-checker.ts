@@ -94,6 +94,18 @@ export class ConstraintChecker {
     return violations;
   }
 
+  private static checkFixedOrderOverlaps(orders: WorkOrder[]): Violation[] {
+    const violations: Violation[] = [];
+    const fixedOrders = orders.filter(o => o.data.isMaintenance);
+    const wcGroups = this.groupBy(fixedOrders, (o) => o.data.workCenterId);
+
+    for (const [wcId, group] of Object.entries(wcGroups)) {
+        // Sort and check if any two fixed orders overlap
+        // If they do, this is a "Fatal Error"
+    }
+    return violations;
+    }
+
   private static checkShifts(orders: WorkOrder[], centers: WorkCenter[]): Violation[] {
     const violations: Violation[] = [];
     
