@@ -72,6 +72,9 @@ export class ConstraintChecker {
     // 5. Check If any Maintenance Orders Overlap (Fatal unfixable violation)
     violations.push(...this.checkFixedOrderOverlaps(orders));
 
+    // 6. Check For Circular dependencies of Orders (Fatal unfixable violation)
+    violations.push(...this.checkCircularDependencies(orders));
+
     return violations;
   }
 
@@ -186,6 +189,48 @@ export class ConstraintChecker {
         }
       }
     }
+    return violations;
+  }
+
+  private static checkCircularDependencies(orders: WorkOrder[]): Violation[] {
+    const violations: Violation[] = [];
+    const orderMap = new Map(orders.map((o) => [o.docId, o]));
+    const visited = new Set<string>();
+    const recStack = new Set<string>(); // Tracking the current recursion path
+
+    const hasCycle = (orderId: string, path: string[]): boolean => {
+      if (recStack.has(orderId)) {
+        // Cycle detected!
+        violations.push({
+          orderId,
+          type: 'DEPENDENCY_ERROR',
+          isFatal: true,
+          message: `FATAL: Circular dependency detected: ${path.join(' -> ')} -> ${orderId}`,
+        });
+        return true;
+      }
+      if (visited.has(orderId)) return false;
+
+      visited.add(orderId);
+      recStack.add(orderId);
+
+      const order = orderMap.get(orderId);
+      if (order) {
+        for (const depId of order.data.dependsOnWorkOrderIds) {
+          if (hasCycle(depId, [...path, orderId])) return true;
+        }
+      }
+
+      recStack.delete(orderId);
+      return false;
+    };
+
+    for (const order of orders) {
+      if (!visited.has(order.docId)) {
+        hasCycle(order.docId, []);
+      }
+    }
+
     return violations;
   }
 
