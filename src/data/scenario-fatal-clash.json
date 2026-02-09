@@ -1,0 +1,54 @@
+{
+  "orders": [
+    {
+      "docId": "19d443e9-0a5a-468d-8198-f0c9addf6110",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-0653",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": true,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "8535e957-c3c8-45dd-90a0-b18266c1f405",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-14de",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T09:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": true,
+        "dependsOnWorkOrderIds": []
+      }
+    }
+  ],
+  "centers": [
+    {
+      "docId": "wc-1",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine A",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": []
+      }
+    }
+  ]
+}
