@@ -1,0 +1,31 @@
+{
+  // Global defaults
+  "files.autoSave": "onFocusChange", // optional but recommended
+
+  // JS/TS settings: Prettier + ESLint
+  "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
+  "[javascript]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.formatOnType": false,
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+  },
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.formatOnType": false,
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+  },
+
+  // Python settings: Ruff
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    },
+    "editor.defaultFormatter": null // disable prettier/black, let Ruff handle it
+  },
+
+  // Prettier-ESLint extension option
+  "vs-code-prettier-eslint.prettierLast": false
+}

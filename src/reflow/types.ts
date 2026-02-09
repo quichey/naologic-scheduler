@@ -1,45 +1,45 @@
 export interface WorkOrder {
   docId: string;
-  docType: "workOrder";
+  docType: 'workOrder';
   data: {
     workOrderNumber: string;
     manufacturingOrderId: string;
     workCenterId: string;
-    startDate: string;              
-    endDate: string;                
-    durationMinutes: number;        
-    isMaintenance: boolean;         // If true, cannot be rescheduled
+    startDate: string;
+    endDate: string;
+    durationMinutes: number;
+    isMaintenance: boolean; // If true, cannot be rescheduled
     dependsOnWorkOrderIds: string[]; // All must complete before this starts
-    setupTimeMinutes?: number;      // Bonus: setup time
+    setupTimeMinutes?: number; // Bonus: setup time
   };
 }
 
 export interface WorkCenter {
   docId: string;
-  docType: "workCenter";
+  docType: 'workCenter';
   data: {
     name: string;
     shifts: Array<{
-      dayOfWeek: number;           // 0-6, Sunday = 0
-      startHour: number;           // 0-23
-      endHour: number;             // 0-23
+      dayOfWeek: number; // 0-6, Sunday = 0
+      startHour: number; // 0-23
+      endHour: number; // 0-23
     }>;
     maintenanceWindows: Array<{
-      startDate: string;           
-      endDate: string;             
-      reason?: string;             
+      startDate: string;
+      endDate: string;
+      reason?: string;
     }>;
   };
 }
 
 export interface ManufacturingOrder {
   docId: string;
-  docType: "manufacturingOrder";
+  docType: 'manufacturingOrder';
   data: {
     manufacturingOrderNumber: string;
     itemId: string;
     quantity: number;
-    dueDate: string;               
+    dueDate: string;
   };
 }
 
