@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { WorkOrder, WorkCenter, ManufacturingOrder } from '../reflow/types.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class DataGenerator {
   // 1. Reusable: Passing parameters instead of hardcoding
@@ -9,6 +11,34 @@ export class DataGenerator {
     const orders = this.generateWorkOrders(orderCount, mos, centers);
 
     return { mos, centers, orders };
+  }
+
+  // Inside DataGenerator class...
+
+  /**
+   * Scenario: Two Maintenance (fixed) orders overlap.
+   * This is GUARANTEED not fixable because fixed orders cannot be moved.
+   */
+  public static createMaintenanceClashScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    const orders: WorkOrder[] = [
+      {
+        ...this.createBaseOrder(uuidv4(), wcId),
+        data: { ...this.createBaseOrder(uuidv4(), wcId).data, isMaintenance: true },
+      },
+      {
+        ...this.createBaseOrder(uuidv4(), wcId),
+        data: {
+          ...this.createBaseOrder(uuidv4(), wcId).data,
+          isMaintenance: true,
+          startDate: '2026-02-09T09:00:00Z', // Overlaps with the one above
+        },
+      },
+    ];
+
+    return { orders, centers };
   }
 
   private static generateWorkCenters(count: number): WorkCenter[] {
@@ -106,3 +136,36 @@ export class DataGenerator {
     return orders;
   }
 }
+
+const run = () => {
+  const args = process.argv.slice(2);
+  const scenarioArg = args.find((a) => a.startsWith('--scenario='))?.split('=')[1];
+
+  const outputDir = path.join(process.cwd(), 'src', 'data');
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+  let result: any;
+  let filename: string;
+
+  if (scenarioArg === 'clash') {
+    result = DataGenerator.createMaintenanceClashScenario();
+    filename = 'scenario-fatal-clash.json';
+    console.log('⚠️ Generating Maintenance Clash Scenario...');
+  } else if (scenarioArg === 'circular') {
+    result = DataGenerator.createCircularScenario();
+    filename = 'scenario-fatal-circular.json';
+    console.log('⚠️ Generating Circular Dependency Scenario...');
+  } else {
+    // Default: Standard dataset
+    const orderCount = parseInt(args[0] || '100');
+    const wcCount = parseInt(args[1] || '3');
+    result = DataGenerator.createDataset(orderCount, wcCount);
+    filename = 'sample-data.json';
+    console.log(`✅ Generating standard dataset: ${orderCount} orders, ${wcCount} centers...`);
+  }
+
+  fs.writeFileSync(path.join(outputDir, filename), JSON.stringify(result, null, 2));
+  console.log(`💾 Saved to src/data/${filename}`);
+};
+
+run();
