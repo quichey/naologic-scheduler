@@ -1,5 +1,3 @@
-
-
 import { DateTime, Interval } from 'luxon';
 import type { WorkOrder, WorkCenter, ManufacturingOrder } from './types.js';
 
@@ -36,7 +34,12 @@ constraints:
 
 export interface Violation {
   orderId: string;
-  type: 'OVERLAP' | 'OUTSIDE_SHIFT' | 'MAINTENANCE_COLLISION' | 'DEPENDENCY_ERROR' | 'FIXED_ORDER_MOVED';
+  type:
+    | 'OVERLAP'
+    | 'OUTSIDE_SHIFT'
+    | 'MAINTENANCE_COLLISION'
+    | 'DEPENDENCY_ERROR'
+    | 'FIXED_ORDER_MOVED';
   message: string;
 }
 
@@ -47,7 +50,7 @@ export class ConstraintChecker {
   public static verify(
     orders: WorkOrder[],
     centers: WorkCenter[],
-    originalOrders?: WorkOrder[] // Used to check if Fixed Orders moved
+    originalOrders?: WorkOrder[], // Used to check if Fixed Orders moved
   ): Violation[] {
     const violations: Violation[] = [];
 
@@ -74,19 +77,21 @@ export class ConstraintChecker {
     const wcGroups = this.groupBy(orders, (o) => o.data.workCenterId);
 
     for (const [wcId, group] of Object.entries(wcGroups)) {
-      const sorted = group.sort((a, b) => 
-        DateTime.fromISO(a.data.startDate).toMillis() - DateTime.fromISO(b.data.startDate).toMillis()
+      const sorted = group.sort(
+        (a, b) =>
+          DateTime.fromISO(a.data.startDate).toMillis() -
+          DateTime.fromISO(b.data.startDate).toMillis(),
       );
 
       for (let i = 0; i < sorted.length - 1; i++) {
         const current = sorted[i]!;
         const next = sorted[i + 1]!;
-        
+
         if (DateTime.fromISO(next.data.startDate) < DateTime.fromISO(current.data.endDate)) {
           violations.push({
             orderId: next.docId,
             type: 'OVERLAP',
-            message: `Work Center ${wcId} is busy with ${current.docId} until ${current.data.endDate}`
+            message: `Work Center ${wcId} is busy with ${current.docId} until ${current.data.endDate}`,
           });
         }
       }
@@ -96,40 +101,40 @@ export class ConstraintChecker {
 
   private static checkFixedOrderOverlaps(orders: WorkOrder[]): Violation[] {
     const violations: Violation[] = [];
-    const fixedOrders = orders.filter(o => o.data.isMaintenance);
+    const fixedOrders = orders.filter((o) => o.data.isMaintenance);
     const wcGroups = this.groupBy(fixedOrders, (o) => o.data.workCenterId);
 
     for (const [wcId, group] of Object.entries(wcGroups)) {
-        // Sort and check if any two fixed orders overlap
-        // If they do, this is a "Fatal Error"
+      // Sort and check if any two fixed orders overlap
+      // If they do, this is a "Fatal Error"
     }
     return violations;
-    }
+  }
 
   private static checkShifts(orders: WorkOrder[], centers: WorkCenter[]): Violation[] {
     const violations: Violation[] = [];
-    
+
     for (const order of orders) {
       // Skip check if it's a fixed maintenance order (Gemini assumption: these bypass shifts)
       if (order.data.isMaintenance) continue;
 
-      const center = centers.find(c => c.docId === order.data.workCenterId);
+      const center = centers.find((c) => c.docId === order.data.workCenterId);
       if (!center) continue;
 
       const start = DateTime.fromISO(order.data.startDate);
       const end = DateTime.fromISO(order.data.endDate);
-      
+
       // Logic: Ensure the time span is within the work center's shifts
       // (This will be complex logic checking dayOfWeek and hour ranges)
       // For now, we flag if the day is not in center.data.shifts
       const day = start.weekday;
-      const hasShift = center.data.shifts.some(s => s.dayOfWeek === day);
-      
+      const hasShift = center.data.shifts.some((s) => s.dayOfWeek === day);
+
       if (!hasShift) {
         violations.push({
           orderId: order.docId,
           type: 'OUTSIDE_SHIFT',
-          message: `Scheduled on day ${day} but Work Center has no shift defined.`
+          message: `Scheduled on day ${day} but Work Center has no shift defined.`,
         });
       }
     }
@@ -138,16 +143,19 @@ export class ConstraintChecker {
 
   private static checkDependencies(orders: WorkOrder[]): Violation[] {
     const violations: Violation[] = [];
-    const orderMap = new Map(orders.map(o => [o.docId, o]));
+    const orderMap = new Map(orders.map((o) => [o.docId, o]));
 
     for (const order of orders) {
       for (const parentId of order.data.dependsOnWorkOrderIds) {
         const parent = orderMap.get(parentId);
-        if (parent && DateTime.fromISO(order.data.startDate) < DateTime.fromISO(parent.data.endDate)) {
+        if (
+          parent &&
+          DateTime.fromISO(order.data.startDate) < DateTime.fromISO(parent.data.endDate)
+        ) {
           violations.push({
             orderId: order.docId,
             type: 'DEPENDENCY_ERROR',
-            message: `Started at ${order.data.startDate} before parent ${parentId} finished at ${parent.data.endDate}`
+            message: `Started at ${order.data.startDate} before parent ${parentId} finished at ${parent.data.endDate}`,
           });
         }
       }
@@ -159,12 +167,12 @@ export class ConstraintChecker {
     const violations: Violation[] = [];
     for (const order of current) {
       if (order.data.isMaintenance) {
-        const orig = original.find(o => o.docId === order.docId);
+        const orig = original.find((o) => o.docId === order.docId);
         if (orig && orig.data.startDate !== order.data.startDate) {
           violations.push({
             orderId: order.docId,
             type: 'FIXED_ORDER_MOVED',
-            message: `Maintenance Work Order was moved from ${orig.data.startDate} to ${order.data.startDate}`
+            message: `Maintenance Work Order was moved from ${orig.data.startDate} to ${order.data.startDate}`,
           });
         }
       }
