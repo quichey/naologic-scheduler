@@ -8,7 +8,7 @@
     "data:gen:clash": "tsx src/scripts/generateData.ts --scenario=clash",
     "data:gen:circular": "tsx src/scripts/generateData.ts --scenario=circular",
     "reflow": "tsx src/reflow/reflow.service.ts",
-    "test": "tsx src/test.ts"
+    "test:constraint-checker": "tsx src/tests/constraint-checker.test.ts"
   },
   "repository": {
     "type": "git",
