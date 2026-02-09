@@ -41,6 +41,7 @@ export interface Violation {
     | 'DEPENDENCY_ERROR'
     | 'FIXED_ORDER_MOVED';
   message: string;
+  isFatal: boolean; // True if the algorithm cannot possibly fix this
 }
 
 export class ConstraintChecker {
@@ -92,6 +93,7 @@ export class ConstraintChecker {
             orderId: next.docId,
             type: 'OVERLAP',
             message: `Work Center ${wcId} is busy with ${current.docId} until ${current.data.endDate}`,
+            isFatal: false,
           });
         }
       }
@@ -135,6 +137,7 @@ export class ConstraintChecker {
           orderId: order.docId,
           type: 'OUTSIDE_SHIFT',
           message: `Scheduled on day ${day} but Work Center has no shift defined.`,
+          isFatal: false,
         });
       }
     }
@@ -156,6 +159,7 @@ export class ConstraintChecker {
             orderId: order.docId,
             type: 'DEPENDENCY_ERROR',
             message: `Started at ${order.data.startDate} before parent ${parentId} finished at ${parent.data.endDate}`,
+            isFatal: false,
           });
         }
       }
@@ -173,6 +177,7 @@ export class ConstraintChecker {
             orderId: order.docId,
             type: 'FIXED_ORDER_MOVED',
             message: `Maintenance Work Order was moved from ${orig.data.startDate} to ${order.data.startDate}`,
+            isFatal: false,
           });
         }
       }
