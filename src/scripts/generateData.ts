@@ -160,6 +160,7 @@ const run = () => {
     const orderCount = parseInt(args[0] || '100');
     const wcCount = parseInt(args[1] || '3');
     result = DataGenerator.createDataset(orderCount, wcCount);
+    // TODO: make filename a param
     filename = 'sample-data.json';
     console.log(`✅ Generating standard dataset: ${orderCount} orders, ${wcCount} centers...`);
   }
