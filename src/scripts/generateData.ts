@@ -1,58 +1,108 @@
-import type { WorkOrder, WorkCenter, ManufacturingOrder } from '../reflow/types.js';
 import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs';
+import type { WorkOrder, WorkCenter, ManufacturingOrder } from '../reflow/types.js';
 
-const generateData = (count: number) => {
-  // 1. Generate 5 Manufacturing Orders
-  const mos: ManufacturingOrder[] = Array.from({ length: 5 }).map((_, i) => ({
-    docId: uuidv4(),
-    docType: 'manufacturingOrder',
-    data: {
-      manufacturingOrderNumber: `MO-100${i}`,
-      itemId: 'PVC-PIPE-100',
-      quantity: 500,
-      dueDate: '2026-03-01T00:00:00Z',
-    },
-  }));
+export class DataGenerator {
+  // 1. Reusable: Passing parameters instead of hardcoding
+  public static createDataset(orderCount: number, wcCount: number = 3) {
+    const mos = this.generateMOs(5);
+    const centers = this.generateWorkCenters(wcCount);
+    const orders = this.generateWorkOrders(orderCount, mos, centers);
 
-  // 2. Generate 3 Work Centers (Machines)
-  const centers: WorkCenter[] = [
-    {
-      docId: 'wc-1',
+    return { mos, centers, orders };
+  }
+
+  private static generateWorkCenters(count: number): WorkCenter[] {
+    return Array.from({ length: count }).map((_, i) => ({
+      docId: `wc-${i + 1}`,
       docType: 'workCenter',
       data: {
-        name: 'Extruder A',
+        name: `Machine ${String.fromCharCode(65 + i)}`,
         shifts: [
-          { dayOfWeek: 1, startHour: 8, endHour: 17 },
-          { dayOfWeek: 2, startHour: 8, endHour: 17 },
-        ], // Mon-Tue 8-5
+          { dayOfWeek: 1, startHour: 8, endHour: 17 }, // Mon
+          { dayOfWeek: 2, startHour: 8, endHour: 17 }, // Tue
+        ],
         maintenanceWindows: [],
       },
-    },
-    // Add more centers here...
-  ];
+    }));
+  }
 
-  // 3. Generate Thousands of Work Orders
-  const orders: WorkOrder[] = [];
-  for (let i = 0; i < count; i++) {
-    const parent = i > 0 && i % 3 !== 0 ? orders[i - 1] : null; // Create chains of 3
-    orders.push({
-      docId: uuidv4(),
+  // 3. Scenario Logic: Guaranteed Unfixable (Circular)
+  public static createCircularScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const idA = uuidv4();
+    const idB = uuidv4();
+
+    const orders: WorkOrder[] = [
+      this.createBaseOrder(idA, 'wc-1', [idB]), // A depends on B
+      this.createBaseOrder(idB, 'wc-1', [idA]), // B depends on A
+    ];
+
+    return { orders, centers };
+  }
+
+  // Helper to keep code DRY
+  private static createBaseOrder(id: string, wcId: string, deps: string[] = []): WorkOrder {
+    return {
+      docId: id,
       docType: 'workOrder',
       data: {
-        workOrderNumber: `WO-${i}`,
-        manufacturingOrderId: mos[i % 5].docId,
-        workCenterId: centers[0].docId,
+        workOrderNumber: `WO-${id.substring(0, 4)}`,
+        manufacturingOrderId: 'mo-1',
+        workCenterId: wcId,
         startDate: '2026-02-09T08:00:00Z',
         endDate: '2026-02-09T10:00:00Z',
         durationMinutes: 120,
         isMaintenance: false,
-        dependsOnWorkOrderIds: parent ? [parent.docId] : [],
+        dependsOnWorkOrderIds: deps,
       },
-    });
+    };
   }
 
-  fs.writeFileSync('sample-data.json', JSON.stringify({ mos, centers, orders }, null, 2));
-};
+  private static generateMOs(count: number): ManufacturingOrder[] {
+    return Array.from({ length: count }).map((_, i) => ({
+      docId: uuidv4(),
+      docType: 'manufacturingOrder',
+      data: {
+        manufacturingOrderNumber: `MO-100${i}`,
+        itemId: `ITEM-${100 + i}`,
+        quantity: Math.floor(Math.random() * 1000) + 100,
+        dueDate: '2026-03-01T00:00:00Z',
+      },
+    }));
+  }
 
-generateData(1000);
+  private static generateWorkOrders(
+    count: number,
+    mos: ManufacturingOrder[],
+    centers: WorkCenter[],
+  ): WorkOrder[] {
+    const orders: WorkOrder[] = [];
+
+    for (let i = 0; i < count; i++) {
+      // Create chains: Every 3rd order starts a new chain (no parent)
+      // Others depend on the order immediately preceding them
+      const parent = i % 3 !== 0 && i > 0 ? orders[i - 1] : null;
+
+      // Rotate through Work Centers and MOs to ensure distribution
+      const targetWC = centers[i % centers.length];
+      const targetMO = mos[i % mos.length];
+
+      orders.push({
+        docId: uuidv4(),
+        docType: 'workOrder',
+        data: {
+          workOrderNumber: `WO-${i}`,
+          manufacturingOrderId: targetMO.docId,
+          workCenterId: targetWC.docId,
+          // Start everyone at the same time to force the Reflow engine to work!
+          startDate: '2026-02-09T08:00:00Z',
+          endDate: '2026-02-09T10:00:00Z',
+          durationMinutes: 120,
+          isMaintenance: false,
+          dependsOnWorkOrderIds: parent ? [parent.docId] : [],
+        },
+      });
+    }
+    return orders;
+  }
+}
