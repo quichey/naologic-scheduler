@@ -69,6 +69,9 @@ export class ConstraintChecker {
     // 4. Check Dependencies
     violations.push(...this.checkDependencies(orders));
 
+    // 5. Check If any Maintenance Orders Overlap (Fatal unfixable violation)
+    violations.push(...this.checkFixedOrderOverlaps(orders));
+
     return violations;
   }
 
@@ -107,8 +110,27 @@ export class ConstraintChecker {
     const wcGroups = this.groupBy(fixedOrders, (o) => o.data.workCenterId);
 
     for (const [wcId, group] of Object.entries(wcGroups)) {
-      // Sort and check if any two fixed orders overlap
-      // If they do, this is a "Fatal Error"
+      // Sort by start time to check neighbors
+      const sorted = group.sort(
+        (a, b) => new Date(a.data.startDate).getTime() - new Date(b.data.startDate).getTime(),
+      );
+
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const current = sorted[i]!;
+        const next = sorted[i + 1]!;
+
+        const currentEnd = new Date(current.data.endDate).getTime();
+        const nextStart = new Date(next.data.startDate).getTime();
+
+        if (nextStart < currentEnd) {
+          violations.push({
+            orderId: next.docId,
+            type: 'MAINTENANCE_COLLISION',
+            isFatal: true, // This is the key!
+            message: `FATAL: Maintenance Order ${next.docId} overlaps with another fixed Maintenance Order ${current.docId} on Work Center ${wcId}.`,
+          });
+        }
+      }
     }
     return violations;
   }
