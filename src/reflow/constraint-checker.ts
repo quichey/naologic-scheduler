@@ -56,26 +56,70 @@ export class ConstraintChecker {
   ): Violation[] {
     const violations: Violation[] = [];
 
-    // 1. Check for Fixed Order integrity (Maintenance WOs shouldn't move)
+    // Check Maintenance Window Collisions FIRST (Highest Precedence)
+    violations.push(...this.checkOrderCollidesWithMaintenanceWindow(orders, centers));
+
+    // Check for Fixed Order integrity (Maintenance WOs shouldn't move)
     if (originalOrders) {
       violations.push(...this.checkFixedOrders(orders, originalOrders));
     }
 
-    // 2. Check Resource Constraints (1 Order at a time per Work Center)
+    // Check Resource Constraints (1 Order at a time per Work Center)
     violations.push(...this.checkOverlaps(orders));
 
-    // 3. Check Shift Adherence (Except for Fixed Maintenance)
+    // Check Shift Adherence (Except for Fixed Maintenance)
     violations.push(...this.checkShifts(orders, centers));
 
-    // 4. Check Dependencies
+    // Check Dependencies
     violations.push(...this.checkDependencies(orders));
 
-    // 5. Check If any Maintenance Orders Overlap (Fatal unfixable violation)
+    // Check If any Maintenance Orders Overlap (Fatal unfixable violation)
     violations.push(...this.checkFixedOrderOverlaps(orders));
 
-    // 6. Check For Circular dependencies of Orders (Fatal unfixable violation)
+    // Check For Circular dependencies of Orders (Fatal unfixable violation)
     violations.push(...this.checkCircularDependencies(orders));
 
+    return violations;
+  }
+
+  private static checkOrderCollidesWithMaintenanceWindow(
+    orders: WorkOrder[],
+    centers: WorkCenter[],
+  ): Violation[] {
+    const violations: Violation[] = [];
+
+    for (const order of orders) {
+      // Maintenance-type Work Orders are allowed to be in maintenance windows
+      // (since they are the maintenance)
+      if (order.data.isMaintenance) continue;
+
+      const center = centers.find((c) => c.docId === order.data.workCenterId);
+      if (!center || !center.data.maintenanceWindows.length) continue;
+
+      const orderInterval = Interval.fromDateTimes(
+        DateTime.fromISO(order.data.startDate, { zone: 'utc' }),
+        DateTime.fromISO(order.data.endDate, { zone: 'utc' }),
+      );
+
+      for (const mw of center.data.maintenanceWindows) {
+        const mwInterval = Interval.fromDateTimes(
+          DateTime.fromISO(mw.startDate, { zone: 'utc' }),
+          DateTime.fromISO(mw.endDate, { zone: 'utc' }),
+        );
+
+        // We check for any overlap at all
+        if (orderInterval.overlaps(mwInterval)) {
+          violations.push({
+            orderId: order.docId,
+            type: 'MAINTENANCE_COLLISION',
+            isFatal: false, // The algorithm should be able to move the WO
+            message: `Work Order ${order.data.workOrderNumber} overlaps with a blocked Maintenance Window (${mw.reason || 'Scheduled Maintenance'}).`,
+          });
+          // Break after first collision for this order to avoid duplicate violations
+          break;
+        }
+      }
+    }
     return violations;
   }
 
