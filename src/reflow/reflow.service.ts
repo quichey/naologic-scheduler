@@ -160,9 +160,8 @@ export class ReflowService {
   }
 
   /**
-   * Checks if the current order's window overlaps with:
-   * 1. Static Maintenance Orders (isMaintenance: true)
-   * 2. The WorkCenter's defined Maintenance Windows
+   * Checks if the current order's window overlaps with either maintenance orders
+   * or the work center's static maintenance windows.
    */
   private static conflictsWithMaintenance(
     order: WorkOrder,
@@ -173,28 +172,27 @@ export class ReflowService {
     const end = DateTime.fromISO(order.data.endDate, { zone: 'utc' });
 
     // 1. Check against Maintenance Work Orders
-    const overlapsMaintenanceOrder = allOrders.some(
-      (o) =>
-        o.data.isMaintenance &&
-        o.data.workCenterId === center.docId &&
-        DateUtils.doPeriodsOverlap(
-          start,
-          end,
-          DateTime.fromISO(o.data.startDate, { zone: 'utc' }),
-          DateTime.fromISO(o.data.endDate, { zone: 'utc' }),
-        ),
-    );
+    const hasOrderConflict = allOrders.some((o) => {
+      if (!o.data.isMaintenance || o.data.workCenterId !== center.docId) return false;
 
-    if (overlapsMaintenanceOrder) return true;
+      const mStart = DateTime.fromISO(o.data.startDate, { zone: 'utc' });
+      const mEnd = DateTime.fromISO(o.data.endDate, { zone: 'utc' });
 
-    // 2. Check against WorkCenter Maintenance Windows
-    const overlapsMaintenanceWindow = center.data.maintenanceWindows.some((window) => {
-      const windowStart = DateTime.fromISO(window.startDate, { zone: 'utc' });
-      const windowEnd = DateTime.fromISO(window.endDate, { zone: 'utc' });
-      return DateUtils.doPeriodsOverlap(start, end, windowStart, windowEnd);
+      // Overlap logic: (StartA < EndB) && (EndA > StartB)
+      return start < mEnd && end > mStart;
     });
 
-    return overlapsMaintenanceWindow;
+    if (hasOrderConflict) return true;
+
+    // 2. Check against WorkCenter Static Maintenance Windows
+    const hasWindowConflict = center.data.maintenanceWindows.some((window) => {
+      const wStart = DateTime.fromISO(window.startDate, { zone: 'utc' });
+      const wEnd = DateTime.fromISO(window.endDate, { zone: 'utc' });
+
+      return start < wEnd && end > wStart;
+    });
+
+    return hasWindowConflict;
   }
   /**
    * Finds the first valid minute for an order to start.
