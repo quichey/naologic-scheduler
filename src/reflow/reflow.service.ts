@@ -85,15 +85,19 @@ export class ReflowService {
         ? DateTime.fromISO(prevOrder.data.endDate, { zone: 'utc' })
         : null;
 
+      // Find the specific original cause for the logs
+      const origViolation = originalViolations.find((v) => v.orderId === currOrder.docId);
       // 2. Logic Branching based on Cascade state
       if (hasCascade) {
         if (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) {
           // We aren't overlapping the previous order, but we might still hit maintenance
-          if (this.conflictsWithMaintenance(currOrder, center, allOrders)) {
+          if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
             changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
-            explanation.push(`Conflicts with maintenance`);
+
+            const reason = `Original violation: ${origViolation.type}`;
+            explanation.push(reason);
             // Cascade continues because we moved
           } else {
             hasCascade = false;
@@ -108,11 +112,13 @@ export class ReflowService {
       } else {
         // No active cascade, checking for original sins
         if (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) {
-          if (this.conflictsWithMaintenance(currOrder, center, allOrders)) {
+          if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
             changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
-            explanation.push(`Conflicts with maintenance`);
+
+            const reason = `Original violation: ${origViolation.type}`;
+            explanation.push(reason);
             hasCascade = true;
           }
         } else {
@@ -123,8 +129,6 @@ export class ReflowService {
 
           this.applyShift(currOrder, nextStart, center, allOrders);
 
-          // Find the specific original cause for the logs
-          const origViolation = originalViolations.find((v) => v.orderId === currOrder.docId);
           const reason = origViolation
             ? `Original violation: ${origViolation.type}`
             : `Collision with previous order ${prevOrder?.data.workOrderNumber}`;
