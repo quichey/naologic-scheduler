@@ -178,8 +178,8 @@ export class ReflowService {
       const mStart = DateTime.fromISO(o.data.startDate, { zone: 'utc' });
       const mEnd = DateTime.fromISO(o.data.endDate, { zone: 'utc' });
 
-      // Overlap logic: (StartA < EndB) && (EndA > StartB)
-      return start < mEnd && end > mStart;
+      // Overlap logic: if the order
+      return (start < mEnd && start >= mStart) || (end <= mEnd && end > mStart);
     });
 
     if (hasOrderConflict) return true;
@@ -189,7 +189,7 @@ export class ReflowService {
       const wStart = DateTime.fromISO(window.startDate, { zone: 'utc' });
       const wEnd = DateTime.fromISO(window.endDate, { zone: 'utc' });
 
-      return start < wEnd && end > wStart;
+      return (start < wEnd && start >= wStart) || (end <= wEnd && end > wStart);
     });
 
     return hasWindowConflict;
