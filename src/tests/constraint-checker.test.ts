@@ -75,7 +75,53 @@ const runTests = () => {
       console.error('❌ Test Failed (Perfect):', err.message);
     }
   }
+  // --- Test Case 5: Maintenance Window Collision ---
+  try {
+    const { orders, centers } = loadScenario('scenario-maintenance-collision.json');
+    const violations = ConstraintChecker.verify(orders, centers);
 
+    const collision = violations.find((v) => v.type === 'MAINTENANCE_COLLISION');
+    assert.ok(collision, 'Should detect overlap with maintenance window');
+    console.log('✅ Test Passed: Maintenance Window Collision detected.');
+  } catch (err) {
+    if (err instanceof Error) console.error('❌ Test Failed (Maintenance):', err.message);
+  }
+
+  // --- Test Case 6: Invalid Start (Outside Shift) ---
+  try {
+    const { orders, centers } = loadScenario('scenario-invalid-start.json');
+    const violations = ConstraintChecker.verify(orders, centers);
+
+    const invalidStart = violations.find((v) => v.message.includes('Invalid Start'));
+    assert.ok(invalidStart, 'Should detect order starting before shift begins');
+    console.log('✅ Test Passed: Invalid Start (Outside Shift) detected.');
+  } catch (err) {
+    if (err instanceof Error) console.error('❌ Test Failed (Invalid Start):', err.message);
+  }
+
+  // --- Test Case 7: Invalid End (Outside Shift) ---
+  try {
+    const { orders, centers } = loadScenario('scenario-invalid-end.json');
+    const violations = ConstraintChecker.verify(orders, centers);
+
+    const invalidEnd = violations.find((v) => v.message.includes('Invalid End'));
+    assert.ok(invalidEnd, 'Should detect order ending after shift ends');
+    console.log('✅ Test Passed: Invalid End (Outside Shift) detected.');
+  } catch (err) {
+    if (err instanceof Error) console.error('❌ Test Failed (Invalid End):', err.message);
+  }
+
+  // --- Test Case 8: Insufficient Working Minutes ---
+  try {
+    const { orders, centers } = loadScenario('scenario-insufficient-time.json');
+    const violations = ConstraintChecker.verify(orders, centers);
+
+    const mismatch = violations.find((v) => v.message.includes('Total work time mismatch'));
+    assert.ok(mismatch, 'Should detect when durationMinutes exceeds actual shift time available');
+    console.log('✅ Test Passed: Insufficient Working Minutes detected.');
+  } catch (err) {
+    if (err instanceof Error) console.error('❌ Test Failed (Insufficient Time):', err.message);
+  }
   console.log('\n🏁 All tests completed.');
 };
 
