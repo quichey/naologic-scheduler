@@ -1,5 +1,6 @@
 import { DateTime, Interval } from 'luxon';
 import type { WorkOrder, WorkCenter, ManufacturingOrder } from './types.js';
+import { DateUtils } from '../utils/date-utils.js';
 
 /*
 Since datasets are going to be large,
@@ -55,26 +56,70 @@ export class ConstraintChecker {
   ): Violation[] {
     const violations: Violation[] = [];
 
-    // 1. Check for Fixed Order integrity (Maintenance WOs shouldn't move)
+    // Check Maintenance Window Collisions FIRST (Highest Precedence)
+    violations.push(...this.checkOrderCollidesWithMaintenanceWindow(orders, centers));
+
+    // Check for Fixed Order integrity (Maintenance WOs shouldn't move)
     if (originalOrders) {
       violations.push(...this.checkFixedOrders(orders, originalOrders));
     }
 
-    // 2. Check Resource Constraints (1 Order at a time per Work Center)
+    // Check Resource Constraints (1 Order at a time per Work Center)
     violations.push(...this.checkOverlaps(orders));
 
-    // 3. Check Shift Adherence (Except for Fixed Maintenance)
+    // Check Shift Adherence (Except for Fixed Maintenance)
     violations.push(...this.checkShifts(orders, centers));
 
-    // 4. Check Dependencies
+    // Check Dependencies
     violations.push(...this.checkDependencies(orders));
 
-    // 5. Check If any Maintenance Orders Overlap (Fatal unfixable violation)
+    // Check If any Maintenance Orders Overlap (Fatal unfixable violation)
     violations.push(...this.checkFixedOrderOverlaps(orders));
 
-    // 6. Check For Circular dependencies of Orders (Fatal unfixable violation)
+    // Check For Circular dependencies of Orders (Fatal unfixable violation)
     violations.push(...this.checkCircularDependencies(orders));
 
+    return violations;
+  }
+
+  private static checkOrderCollidesWithMaintenanceWindow(
+    orders: WorkOrder[],
+    centers: WorkCenter[],
+  ): Violation[] {
+    const violations: Violation[] = [];
+
+    for (const order of orders) {
+      // Maintenance-type Work Orders are allowed to be in maintenance windows
+      // (since they are the maintenance)
+      if (order.data.isMaintenance) continue;
+
+      const center = centers.find((c) => c.docId === order.data.workCenterId);
+      if (!center || !center.data.maintenanceWindows.length) continue;
+
+      const orderInterval = Interval.fromDateTimes(
+        DateTime.fromISO(order.data.startDate, { zone: 'utc' }),
+        DateTime.fromISO(order.data.endDate, { zone: 'utc' }),
+      );
+
+      for (const mw of center.data.maintenanceWindows) {
+        const mwInterval = Interval.fromDateTimes(
+          DateTime.fromISO(mw.startDate, { zone: 'utc' }),
+          DateTime.fromISO(mw.endDate, { zone: 'utc' }),
+        );
+
+        // We check for any overlap at all
+        if (orderInterval.overlaps(mwInterval)) {
+          violations.push({
+            orderId: order.docId,
+            type: 'MAINTENANCE_COLLISION',
+            isFatal: false, // The algorithm should be able to move the WO
+            message: `Work Order ${order.data.workOrderNumber} overlaps with a blocked Maintenance Window (${mw.reason || 'Scheduled Maintenance'}).`,
+          });
+          // Break after first collision for this order to avoid duplicate violations
+          break;
+        }
+      }
+    }
     return violations;
   }
 
@@ -142,26 +187,55 @@ export class ConstraintChecker {
     const violations: Violation[] = [];
 
     for (const order of orders) {
-      // Skip check if it's a fixed maintenance order (Gemini assumption: these bypass shifts)
       if (order.data.isMaintenance) continue;
 
       const center = centers.find((c) => c.docId === order.data.workCenterId);
       if (!center) continue;
 
-      const start = DateTime.fromISO(order.data.startDate);
-      const end = DateTime.fromISO(order.data.endDate);
+      const start = DateTime.fromISO(order.data.startDate, { zone: 'utc' });
+      const end = DateTime.fromISO(order.data.endDate, { zone: 'utc' });
 
-      // Logic: Ensure the time span is within the work center's shifts
-      // (This will be complex logic checking dayOfWeek and hour ranges)
-      // For now, we flag if the day is not in center.data.shifts
-      const day = start.weekday;
-      const hasShift = center.data.shifts.some((s) => s.dayOfWeek === day);
+      // 1. Existing check: Is the TOTAL duration correct?
+      const actualMins = DateUtils.calculateWorkingMinutes(
+        order.data.startDate,
+        order.data.endDate,
+        center,
+      );
 
-      if (!hasShift) {
+      if (Math.abs(actualMins - order.data.durationMinutes) > 1) {
         violations.push({
           orderId: order.docId,
           type: 'OUTSIDE_SHIFT',
-          message: `Scheduled on day ${day} but Work Center has no shift defined.`,
+          message: `Total work time mismatch: Needs ${order.data.durationMinutes}m, but provided window only allows for ${actualMins}m of shift time.`,
+          isFatal: false,
+        });
+      }
+
+      // 2. NEW check: Is the startDate actually inside a shift?
+      const isStartInShift = center.data.shifts.some(
+        (s) =>
+          s.dayOfWeek === start.weekday % 7 && start.hour >= s.startHour && start.hour < s.endHour,
+      );
+
+      if (!isStartInShift) {
+        violations.push({
+          orderId: order.docId,
+          type: 'OUTSIDE_SHIFT',
+          message: `Invalid Start: Work Order is scheduled to start at ${start.toFormat('HH:mm')} on a day/time with no active shift.`,
+          isFatal: false,
+        });
+      }
+
+      // 3. NEW check: Is the endDate actually inside a shift?
+      const isEndInShift = center.data.shifts.some(
+        (s) => s.dayOfWeek === end.weekday % 7 && end.hour > s.startHour && end.hour <= s.endHour,
+      );
+
+      if (!isEndInShift) {
+        violations.push({
+          orderId: order.docId,
+          type: 'OUTSIDE_SHIFT',
+          message: `Invalid End: Work Order is scheduled to end at ${end.toFormat('HH:mm')} on a day/time with no active shift.`,
           isFatal: false,
         });
       }

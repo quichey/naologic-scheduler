@@ -1,0 +1,46 @@
+{
+  "orders": [
+    {
+      "docId": "89c6f3c2-a422-4db0-ad4b-1d56bbb8cfa8",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-89c6",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T09:00:00Z",
+        "endDate": "2026-02-09T11:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    }
+  ],
+  "centers": [
+    {
+      "docId": "wc-1",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine A",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": [
+          {
+            "startDate": "2026-02-09T10:00:00Z",
+            "endDate": "2026-02-09T12:00:00Z",
+            "reason": "Emergency Repair"
+          }
+        ]
+      }
+    }
+  ]
+}
