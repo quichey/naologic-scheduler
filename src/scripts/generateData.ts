@@ -14,6 +14,87 @@ export class DataGenerator {
   }
 
   /**
+   * Scenario: An order collides with a Maintenance window.
+   */
+  public static createOrderCollidesWithMaintenance(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(1);
+
+    // Define a maintenance window from 10:00 to 12:00
+    centers[0].data.maintenanceWindows = [
+      {
+        startDate: '2026-02-09T10:00:00Z',
+        endDate: '2026-02-09T12:00:00Z',
+        reason: 'Emergency Repair',
+      },
+    ];
+
+    const wcId = centers[0].docId;
+
+    // Create an order that starts at 09:00 and ends at 11:00
+    // It collides with the first hour of maintenance
+    const order = this.createBaseOrder(uuidv4(), wcId);
+    order.data.startDate = '2026-02-09T09:00:00Z';
+    order.data.endDate = '2026-02-09T11:00:00Z';
+    order.data.durationMinutes = 120;
+
+    return {
+      orders: [order],
+      centers,
+    };
+  }
+  /**
+   * Scenario: Order starts at 06:00 AM, but shift starts at 08:00 AM.
+   */
+  public static createInvalidStartScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    const order = this.createBaseOrder(uuidv4(), wcId);
+    order.data.startDate = '2026-02-09T06:00:00Z'; // 2 hours before shift
+    order.data.endDate = '2026-02-09T09:00:00Z';
+    order.data.durationMinutes = 60; // Only 60 mins (08:00-09:00) is valid
+
+    return { orders: [order], centers };
+  }
+
+  /**
+   * Scenario: Order ends at 07:00 PM, but shift ends at 05:00 PM (17:00).
+   */
+  public static createInvalidEndScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    const order = this.createBaseOrder(uuidv4(), wcId);
+    order.data.startDate = '2026-02-09T15:00:00Z';
+    order.data.endDate = '2026-02-09T19:00:00Z'; // 2 hours after shift
+    order.data.durationMinutes = 120; // Only 120 mins (15:00-17:00) is valid
+
+    return { orders: [order], centers };
+  }
+  /**
+   * Scenario: Order is within shift boundaries, but the window is too small.
+   * Required: 120m. Provided: 60m.
+   */
+  public static createInsufficientMinutesScenario(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    const order = this.createBaseOrder(uuidv4(), wcId);
+    // Starts at 8am, ends at 9am (60 minute window)
+    order.data.startDate = '2026-02-09T08:00:00Z';
+    order.data.endDate = '2026-02-09T09:00:00Z';
+    // But the order explicitly says it NEEDS 120 minutes to complete
+    order.data.durationMinutes = 120;
+
+    return { orders: [order], centers };
+  }
+  /**
    * Scenario: A perfectly sequenced schedule.
    * 3 Orders: A -> B -> C, all on the same Work Center, no overlaps.
    */
@@ -183,6 +264,24 @@ const run = () => {
     result = DataGenerator.createPerfectScenario();
     filename = 'scenario-perfect.json';
     console.log('✨ Generating Violation-Free Scenario...');
+  } else if (scenarioArg === 'maintenance') {
+    // NEW SCENARIO
+    result = DataGenerator.createOrderCollidesWithMaintenance();
+    filename = 'scenario-maintenance-collision.json';
+    console.log('🚧 Generating Maintenance Collision Scenario...');
+  } else if (scenarioArg === 'invalid-start') {
+    result = DataGenerator.createInvalidStartScenario();
+    filename = 'scenario-invalid-start.json';
+    console.log('🌅 Generating Invalid Start Scenario...');
+  } else if (scenarioArg === 'invalid-end') {
+    result = DataGenerator.createInvalidEndScenario();
+    filename = 'scenario-invalid-end.json';
+    console.log('🌃 Generating Invalid End Scenario...');
+  } else if (scenarioArg === 'insufficient-time') {
+    // NEW SCENARIO
+    result = DataGenerator.createInsufficientMinutesScenario();
+    filename = 'scenario-insufficient-time.json';
+    console.log('⏳ Generating Insufficient Minutes Scenario...');
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');

@@ -8,6 +8,10 @@
     "data:gen:clash": "tsx src/scripts/generateData.ts --scenario=clash",
     "data:gen:circular": "tsx src/scripts/generateData.ts --scenario=circular",
     "data:gen:perfect": "tsx src/scripts/generateData.ts --scenario=perfect",
+    "data:gen:maintenance": "tsx src/scripts/generateData.ts --scenario=maintenance",
+    "data:gen:invalid-start": "tsx src/scripts/generateData.ts --scenario=invalid-start",
+    "data:gen:invalid-end": "tsx src/scripts/generateData.ts --scenario=invalid-end",
+    "data:gen:insufficient-time": "tsx src/scripts/generateData.ts --scenario=insufficient-time",
     "reflow": "tsx src/reflow/reflow.service.ts",
     "test:constraint-checker": "tsx src/tests/constraint-checker.test.ts"
   },
