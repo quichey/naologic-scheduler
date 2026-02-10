@@ -24,13 +24,16 @@ export class ReflowService {
       throw Error('NOT FIXABLE');
     }
     // Do schedule changes
-    return this.reschedule(orders, centers);
+    return this.reschedule(orders, centers, violations);
   }
-  private static reschedule(orders: WorkOrder[], centers: WorkCenter[]): ReflowedSchedule {
+  private static reschedule(
+    orders: WorkOrder[],
+    centers: WorkCenter[],
+    originalViolations: Violation[],
+  ): ReflowedSchedule {
     let currentOrders = JSON.parse(JSON.stringify(orders));
     let changes: string[] = [];
     let explanation: string[] = [];
-    const rootCauses = new Map<string, string>();
 
     // We process center by center
     for (const center of centers) {
@@ -42,7 +45,7 @@ export class ReflowService {
         centerOrders,
         center,
         currentOrders,
-        rootCauses,
+        originalViolations,
         changes,
         explanation,
       );
@@ -62,145 +65,153 @@ export class ReflowService {
   private static rescheduleByCenter(
     orders: WorkOrder[],
     center: WorkCenter,
-    allOrders: WorkOrder[], // Needed to check cross-center parent endDates
-    rootCauses: Map<string, string>,
+    allOrders: WorkOrder[],
+    originalViolations: Violation[],
     changes: string[],
     explanation: string[],
   ): WorkOrder[] {
-    // 1. Generate the Master Processing Order using your blueprint
     const processingOrder = SequencePreserver.prepare(orders).get(center.docId) || [];
+    const correctlyScheduledOrders: WorkOrder[] = [];
 
-    let hasCascade = false
-    for (var i = 0; i < processingOrder.length; i++) {
-      const currOrder = //get cur order in processingOrder
-      const prevOrder = //get prev order in processingOrder
-      // adjust the schedule
-      // check if currOrder overlaps with prevOrder or starts before prevOrder because of some cascade
-      // or if it overlaps with maintenance
-      // use the helper functions for finding start and end date
+    let hasCascade = false;
 
-      // after making adjustments if necessary, provide the changes and explanations
-      // Explanations:
-      // 1. check the original violations for dependency violation
-      // 2. collision with maintenance
-      // 3. collision with previous order
-      // 4. cascade shift 
+    for (let i = 0; i < processingOrder.length; i++) {
+      // 1. Setup current and previous context
+      const currOrder = processingOrder[i].order;
+      const prevOrder = i > 0 ? correctlyScheduledOrders[i - 1] : null;
+
+      const currOrderStartDate = DateTime.fromISO(currOrder.data.startDate, { zone: 'utc' });
+      const prevOrderEndDate = prevOrder
+        ? DateTime.fromISO(prevOrder.data.endDate, { zone: 'utc' })
+        : null;
+
+      // 2. Logic Branching based on Cascade state
+      if (hasCascade) {
+        if (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) {
+          // We aren't overlapping the previous order, but we might still hit maintenance
+          if (this.conflictsWithMaintenance(currOrder, center, allOrders)) {
+            const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
+            this.applyShift(currOrder, newStart, center, allOrders);
+            changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+            explanation.push(`Conflicts with maintenance`);
+            // Cascade continues because we moved
+          } else {
+            hasCascade = false;
+          }
+        } else {
+          // Overlap detected due to a previous move
+          const newStart = this.findNextAvailableStart(prevOrderEndDate!, center, allOrders);
+          this.applyShift(currOrder, newStart, center, allOrders);
+          changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+          explanation.push(`Cascading shift changes due to earlier violations`);
+        }
+      } else {
+        // No active cascade, checking for original sins
+        if (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) {
+          if (this.conflictsWithMaintenance(currOrder, center, allOrders)) {
+            const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
+            this.applyShift(currOrder, newStart, center, allOrders);
+            changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+            explanation.push(`Conflicts with maintenance`);
+            hasCascade = true;
+          }
+        } else {
+          // Either overlap with previous OR an original violation (Shift/Dependency)
+          const nextStart = prevOrderEndDate
+            ? this.findNextAvailableStart(prevOrderEndDate, center, allOrders)
+            : this.findNextAvailableStart(currOrderStartDate, center, allOrders);
+
+          this.applyShift(currOrder, nextStart, center, allOrders);
+
+          // Find the specific original cause for the logs
+          const origViolation = originalViolations.find((v) => v.orderId === currOrder.docId);
+          const reason = origViolation
+            ? `Original violation: ${origViolation.type}`
+            : `Collision with previous order ${prevOrder?.data.workOrderNumber}`;
+
+          changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+          explanation.push(reason);
+          hasCascade = true;
+        }
+      }
+
+      correctlyScheduledOrders.push(currOrder);
     }
+
+    return correctlyScheduledOrders;
   }
-  /*
-  Assume orders all have the same work center
-  */
-  private static rescheduleByCenterOld(
-    orders: WorkOrder[],
+
+  /**
+   * Small helper to apply time changes and re-calculate end date
+   */
+  private static applyShift(
+    order: WorkOrder,
+    start: DateTime,
     center: WorkCenter,
-    allOrders: WorkOrder[], // Needed to check cross-center parent endDates
-    rootCauses: Map<string, string>,
-    changes: string[],
-    explanation: string[],
-  ): WorkOrder[] {
-    // Sort chronologically
-    let sorted = [...orders].sort(
-      (a, b) =>
-        DateTime.fromISO(a.data.startDate).toMillis() -
-        DateTime.fromISO(b.data.startDate).toMillis(),
+    allOrders: WorkOrder[],
+  ) {
+    order.data.startDate = start.toISO()!;
+    order.data.endDate = this.findEndDate(
+      start,
+      order.data.durationMinutes,
+      center,
+      allOrders,
+    ).toISO()!;
+  }
+
+  /**
+   * Checks if the current order's window overlaps with:
+   * 1. Static Maintenance Orders (isMaintenance: true)
+   * 2. The WorkCenter's defined Maintenance Windows
+   */
+  private static conflictsWithMaintenance(
+    order: WorkOrder,
+    center: WorkCenter,
+    allOrders: WorkOrder[],
+  ): boolean {
+    const start = DateTime.fromISO(order.data.startDate, { zone: 'utc' });
+    const end = DateTime.fromISO(order.data.endDate, { zone: 'utc' });
+
+    // 1. Check against Maintenance Work Orders
+    const overlapsMaintenanceOrder = allOrders.some(
+      (o) =>
+        o.data.isMaintenance &&
+        o.data.workCenterId === center.docId &&
+        DateUtils.doPeriodsOverlap(
+          start,
+          end,
+          DateTime.fromISO(o.data.startDate, { zone: 'utc' }),
+          DateTime.fromISO(o.data.endDate, { zone: 'utc' }),
+        ),
     );
 
-    for (let i = 0; i < sorted.length; i++) {
-      let order = sorted[i];
+    if (overlapsMaintenanceOrder) return true;
 
-      // 1. Dependency Check (Cross-Center)
-      // If parent is on another machine, we must start AFTER it.
-      for (const depId of order.data.dependsOnWorkOrderIds) {
-        const parent = allOrders.find((o) => o.docId === depId);
-        if (parent) {
-          const parentEnd = DateTime.fromISO(parent.data.endDate, { zone: 'utc' });
-          const currentStart = DateTime.fromISO(order.data.startDate, { zone: 'utc' });
+    // 2. Check against WorkCenter Maintenance Windows
+    const overlapsMaintenanceWindow = center.data.maintenanceWindows.some((window) => {
+      const windowStart = DateTime.fromISO(window.startDate, { zone: 'utc' });
+      const windowEnd = DateTime.fromISO(window.endDate, { zone: 'utc' });
+      return DateUtils.doPeriodsOverlap(start, end, windowStart, windowEnd);
+    });
 
-          if (currentStart < parentEnd) {
-            const oldStart = order.data.startDate;
-            // Ensure the child starts at the parent end OR the next shift start
-            const nextValidStart = this.findNextAvailableStart(parentEnd, center);
-
-            order.data.startDate = nextValidStart.toISO()!;
-            order.data.endDate = this.findEndDate(
-              nextValidStart,
-              order.data.durationMinutes,
-              center,
-            ).toISO()!;
-
-            rootCauses.set(order.docId, parent.data.workOrderNumber);
-            changes.push(
-              `[${center.docId}] Moved ${order.data.workOrderNumber} to start after parent ${parent.data.workOrderNumber}`,
-            );
-            explanation.push(
-              `Reflowed ${order.data.workOrderNumber} due to dependency on ${parent.data.workOrderNumber}`,
-            );
-          }
-        }
-      }
-
-      // 2. Local Constraints Check (Shifts, Overlaps, Maintenance)
-      let violations = ConstraintChecker.verify(allOrders, [center]).filter(
-        (v) => v.orderId === order.docId,
-      );
-
-      while (violations.length > 0) {
-        const v = violations[0];
-        const blockerIdMatch = v.message.match(/busy with ([\w-]+) until/);
-        const blockerId = blockerIdMatch ? blockerIdMatch[1] : null;
-
-        const trigger = blockerId || v.type;
-        const originalCause = rootCauses.get(trigger) || trigger;
-        rootCauses.set(order.docId, originalCause);
-
-        const oldStart = order.data.startDate;
-        // Jump logic: If it's an overlap, jump to end of blocker. Otherwise nudge.
-        let nextStart: DateTime;
-        if (blockerId) {
-          const blocker = allOrders.find((o) => o.docId === blockerId);
-          nextStart = this.findNextAvailableStart(
-            DateTime.fromISO(blocker!.data.endDate, { zone: 'utc' }),
-            center,
-          );
-        } else {
-          // If it's a shift or maintenance violation, jump to the next minute and let the helper find the next shift
-          const current = DateTime.fromISO(order.data.startDate, { zone: 'utc' });
-          nextStart = this.findNextAvailableStart(current.plus({ minutes: 1 }), center);
-        }
-
-        order.data.startDate = nextStart.toISO()!;
-        order.data.endDate = this.findEndDate(
-          nextStart,
-          order.data.durationMinutes,
-          center,
-        ).toISO()!;
-
-        changes.push(
-          `[${center.docId}] Moved ${order.data.workOrderNumber} from ${oldStart} to ${order.data.startDate}`,
-        );
-        explanation.push(
-          `Reflowed ${order.data.workOrderNumber} because of a cascade started by ${originalCause}`,
-        );
-
-        // Re-verify specific to this order
-        violations = ConstraintChecker.verify(allOrders, [center]).filter(
-          (v) => v.orderId === order.docId,
-        );
-      }
-    }
-    return sorted;
+    return overlapsMaintenanceWindow;
   }
-
   /**
    * Finds the first valid minute for an order to start.
    * It must be within a WorkCenter shift AND not overlapping a Maintenance Work Order.
    */
-  private static findNextAvailableStart(proposedStart: DateTime, center: WorkCenter, allOrders: WorkOrder[]): DateTime {
+  private static findNextAvailableStart(
+    proposedStart: DateTime,
+    center: WorkCenter,
+    allOrders: WorkOrder[],
+  ): DateTime {
     let current = proposedStart;
     let foundValidStart = false;
 
     // Filter maintenance orders for this specific center once to optimize
-    const maintenance = allOrders.filter(o => o.data.isMaintenance && o.data.workCenterId === center.docId);
+    const maintenance = allOrders.filter(
+      (o) => o.data.isMaintenance && o.data.workCenterId === center.docId,
+    );
 
     // We keep checking until we find a time that satisfies both Shift and Maintenance constraints
     while (!foundValidStart) {
@@ -214,7 +225,12 @@ export class ReflowService {
         continue;
       }
 
-      const shiftStart = current.set({ hour: shift.startHour, minute: 0, second: 0, millisecond: 0 });
+      const shiftStart = current.set({
+        hour: shift.startHour,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      });
       const shiftEnd = current.set({ hour: shift.endHour, minute: 0, second: 0, millisecond: 0 });
 
       if (current < shiftStart) {
@@ -228,7 +244,7 @@ export class ReflowService {
 
       // --- 2. Maintenance Check ---
       // Find any maintenance block that currently "swallows" our proposed start time
-      const blocker = maintenance.find(m => {
+      const blocker = maintenance.find((m) => {
         const mStart = DateTime.fromISO(m.data.startDate, { zone: 'utc' });
         const mEnd = DateTime.fromISO(m.data.endDate, { zone: 'utc' });
         return current >= mStart && current < mEnd;
@@ -246,56 +262,66 @@ export class ReflowService {
 
     return current;
   }
-  private static findEndDate(start: DateTime, duration: number, center: WorkCenter, allOrders: WorkOrder[]): DateTime {
-  let remainingMins = duration;
-  let current = start;
+  private static findEndDate(
+    start: DateTime,
+    duration: number,
+    center: WorkCenter,
+    allOrders: WorkOrder[],
+  ): DateTime {
+    let remainingMins = duration;
+    let current = start;
 
-  const maintenance = allOrders.filter(o => o.data.isMaintenance && o.data.workCenterId === center.docId);
+    const maintenance = allOrders.filter(
+      (o) => o.data.isMaintenance && o.data.workCenterId === center.docId,
+    );
 
-  while (remainingMins > 0) {
-    const dayOfWeek = current.weekday % 7;
-    const shift = center.data.shifts.find((s) => s.dayOfWeek === dayOfWeek);
+    while (remainingMins > 0) {
+      const dayOfWeek = current.weekday % 7;
+      const shift = center.data.shifts.find((s) => s.dayOfWeek === dayOfWeek);
 
-    if (shift) {
-      const shiftEnd = current.set({ hour: shift.endHour, minute: 0, second: 0, millisecond: 0 });
-      
-      // 1. Find any maintenance that starts between 'current' and 'shiftEnd'
-      const nextMaintenance = maintenance
-        .map(m => ({ start: DateTime.fromISO(m.data.startDate, { zone: 'utc' }), end: DateTime.fromISO(m.data.endDate, { zone: 'utc' }) }))
-        .filter(m => m.start >= current && m.start < shiftEnd)
-        .sort((a, b) => a.start.toMillis() - b.start.toMillis())[0];
+      if (shift) {
+        const shiftEnd = current.set({ hour: shift.endHour, minute: 0, second: 0, millisecond: 0 });
 
-      // 2. Determine the "Next Deadline" (either the shift end or the next maintenance start)
-      const nextObstacle = nextMaintenance ? nextMaintenance.start : shiftEnd;
-      const minutesAvailable = nextObstacle.diff(current, 'minutes').minutes;
+        // 1. Find any maintenance that starts between 'current' and 'shiftEnd'
+        const nextMaintenance = maintenance
+          .map((m) => ({
+            start: DateTime.fromISO(m.data.startDate, { zone: 'utc' }),
+            end: DateTime.fromISO(m.data.endDate, { zone: 'utc' }),
+          }))
+          .filter((m) => m.start >= current && m.start < shiftEnd)
+          .sort((a, b) => a.start.toMillis() - b.start.toMillis())[0];
 
-      if (minutesAvailable > 0) {
-        if (remainingMins <= minutesAvailable) {
-          // We finish before the next obstacle!
-          return current.plus({ minutes: remainingMins });
-        } else {
-          // Consume available time and jump to the obstacle
-          remainingMins -= minutesAvailable;
-          current = nextObstacle;
+        // 2. Determine the "Next Deadline" (either the shift end or the next maintenance start)
+        const nextObstacle = nextMaintenance ? nextMaintenance.start : shiftEnd;
+        const minutesAvailable = nextObstacle.diff(current, 'minutes').minutes;
+
+        if (minutesAvailable > 0) {
+          if (remainingMins <= minutesAvailable) {
+            // We finish before the next obstacle!
+            return current.plus({ minutes: remainingMins });
+          } else {
+            // Consume available time and jump to the obstacle
+            remainingMins -= minutesAvailable;
+            current = nextObstacle;
+          }
+        }
+
+        // 3. Handle Obstacle Jumping
+        if (nextMaintenance && current.equals(nextMaintenance.start)) {
+          // We hit maintenance! Jump to the end of it and continue the loop
+          current = nextMaintenance.end;
+          continue; // Re-check if we are still within shift or if maintenance pushed us out
         }
       }
 
-      // 3. Handle Obstacle Jumping
-      if (nextMaintenance && current.equals(nextMaintenance.start)) {
-        // We hit maintenance! Jump to the end of it and continue the loop
-        current = nextMaintenance.end;
-        continue; // Re-check if we are still within shift or if maintenance pushed us out
+      // 4. If we are at shift end or in a non-working period, jump to next shift start
+      current = current.plus({ days: 1 }).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+      const nextDayShift = center.data.shifts.find((s) => s.dayOfWeek === current.weekday % 7);
+      if (nextDayShift) {
+        current = current.set({ hour: nextDayShift.startHour });
       }
     }
 
-    // 4. If we are at shift end or in a non-working period, jump to next shift start
-    current = current.plus({ days: 1 }).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
-    const nextDayShift = center.data.shifts.find((s) => s.dayOfWeek === current.weekday % 7);
-    if (nextDayShift) {
-      current = current.set({ hour: nextDayShift.startHour });
-    }
+    return current;
   }
-
-  return current;
-}
 }
