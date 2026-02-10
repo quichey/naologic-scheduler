@@ -33,7 +33,7 @@ const runTests = () => {
     const { orders, centers } = loadScenario('scenario-fatal-clash.json');
     const violations = ConstraintChecker.verify(orders, centers);
 
-    const fatal = violations.find((v) => v.isFatal && v.type === 'OVERLAP');
+    const fatal = violations.find((v) => v.isFatal && v.type === 'MAINTENANCE_COLLISION');
     assert.ok(fatal, 'Scenario 3 should have a fatal overlap error (Maintenance)');
     console.log('✅ Test Passed: Maintenance Clash detected.');
   } catch (err) {
