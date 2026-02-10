@@ -35,7 +35,9 @@ export class SequencePreserver {
     const wcIds = [...new Set(orders.map((o) => o.data.workCenterId))];
 
     for (const wcId of wcIds) {
-      const centerOrders = orders.filter((o) => o.data.workCenterId === wcId);
+      const centerOrders = orders.filter(
+        (o) => o.data.workCenterId === wcId && !o.data.isMaintenance, // Evict maintenance from the sequencing logic
+      );
 
       const dependencyGroups = this.findDependencyGroups(centerOrders);
       const originalSequence = this.findOriginalSequenceOrder(centerOrders);

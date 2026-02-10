@@ -1,6 +1,7 @@
 import type { WorkOrder, WorkCenter, ManufacturingOrder } from './types.js';
 import type { Violation } from './constraint-checker.js';
 import { ConstraintChecker } from './constraint-checker.js';
+import { SequencePreserver } from './sequence-preserver.js';
 
 import { DateTime } from 'luxon';
 import { DateUtils } from '../utils/date-utils.js';
@@ -59,6 +60,37 @@ export class ReflowService {
   Assume orders all have the same work center
   */
   private static rescheduleByCenter(
+    orders: WorkOrder[],
+    center: WorkCenter,
+    allOrders: WorkOrder[], // Needed to check cross-center parent endDates
+    rootCauses: Map<string, string>,
+    changes: string[],
+    explanation: string[],
+  ): WorkOrder[] {
+    // 1. Generate the Master Processing Order using your blueprint
+    const processingOrder = SequencePreserver.prepare(orders).get(center.docId) || [];
+
+    let hasCascade = false
+    for (var i = 0; i < processingOrder.length; i++) {
+      const currOrder = //get cur order in processingOrder
+      const prevOrder = //get prev order in processingOrder
+      // adjust the schedule
+      // check if currOrder overlaps with prevOrder or starts before prevOrder because of some cascade
+      // or if it overlaps with maintenance
+      // use the helper functions for finding start and end date
+
+      // after making adjustments if necessary, provide the changes and explanations
+      // Explanations:
+      // 1. check the original violations for dependency violation
+      // 2. collision with maintenance
+      // 3. collision with previous order
+      // 4. cascade shift 
+    }
+  }
+  /*
+  Assume orders all have the same work center
+  */
+  private static rescheduleByCenterOld(
     orders: WorkOrder[],
     center: WorkCenter,
     allOrders: WorkOrder[], // Needed to check cross-center parent endDates
@@ -162,8 +194,9 @@ export class ReflowService {
   /**
    * Ensures the proposed start date actually lands inside a shift.
    * If it lands in the middle of the night/weekend, it "teleports" to the next shift start.
+   * check allOrders for maintenanceOrders that need to be avoided collisions with
    */
-  private static findNextAvailableStart(proposedStart: DateTime, center: WorkCenter): DateTime {
+  private static findNextAvailableStart(proposedStart: DateTime, center: WorkCenter, allOrders: WorkOrder[]): DateTime {
     let current = proposedStart;
 
     // We loop because we might jump to a day that has no shift (e.g., Saturday)
@@ -195,7 +228,7 @@ export class ReflowService {
 
     return current; // Safety fallback
   }
-  private static findEndDate(start: DateTime, duration: number, center: WorkCenter): DateTime {
+  private static findEndDate(start: DateTime, duration: number, center: WorkCenter, allOrders: WorkOrder[]): DateTime {
     let remainingMins = duration;
     let current = start;
 
