@@ -1,5 +1,6 @@
 import { DateTime, Interval } from 'luxon';
 import type { WorkOrder, WorkCenter, ManufacturingOrder } from './types.js';
+import { DateUtils } from '../utils/date-utils.js';
 
 /*
 Since datasets are going to be large,
@@ -142,26 +143,23 @@ export class ConstraintChecker {
     const violations: Violation[] = [];
 
     for (const order of orders) {
-      // Skip check if it's a fixed maintenance order (Gemini assumption: these bypass shifts)
       if (order.data.isMaintenance) continue;
 
       const center = centers.find((c) => c.docId === order.data.workCenterId);
       if (!center) continue;
 
-      const start = DateTime.fromISO(order.data.startDate);
-      const end = DateTime.fromISO(order.data.endDate);
+      const actualMins = DateUtils.calculateWorkingMinutes(
+        order.data.startDate,
+        order.data.endDate,
+        center,
+      );
 
-      // Logic: Ensure the time span is within the work center's shifts
-      // (This will be complex logic checking dayOfWeek and hour ranges)
-      // For now, we flag if the day is not in center.data.shifts
-      const day = start.weekday;
-      const hasShift = center.data.shifts.some((s) => s.dayOfWeek === day);
-
-      if (!hasShift) {
+      // Allowing a 1-minute buffer for rounding if necessary
+      if (Math.abs(actualMins - order.data.durationMinutes) > 1) {
         violations.push({
           orderId: order.docId,
           type: 'OUTSIDE_SHIFT',
-          message: `Scheduled on day ${day} but Work Center has no shift defined.`,
+          message: `Schedule mismatch: Needs ${order.data.durationMinutes}m of work, but time slot provides ${actualMins}m (after shifts/maintenance).`,
           isFatal: false,
         });
       }
