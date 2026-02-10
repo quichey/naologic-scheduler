@@ -86,9 +86,15 @@ export class ReflowService {
 
           if (currentStart < parentEnd) {
             const oldStart = order.data.startDate;
-            order.data.startDate = parentEnd.toISO()!;
-            const endDt = this.findEndDate(parentEnd, order.data.durationMinutes, center);
-            order.data.endDate = endDt.toISO()!;
+            // Ensure the child starts at the parent end OR the next shift start
+            const nextValidStart = this.findNextAvailableStart(parentEnd, center);
+
+            order.data.startDate = nextValidStart.toISO()!;
+            order.data.endDate = this.findEndDate(
+              nextValidStart,
+              order.data.durationMinutes,
+              center,
+            ).toISO()!;
 
             rootCauses.set(order.docId, parent.data.workOrderNumber);
             changes.push(
@@ -120,14 +126,22 @@ export class ReflowService {
         let nextStart: DateTime;
         if (blockerId) {
           const blocker = allOrders.find((o) => o.docId === blockerId);
-          nextStart = DateTime.fromISO(blocker!.data.endDate, { zone: 'utc' });
+          nextStart = this.findNextAvailableStart(
+            DateTime.fromISO(blocker!.data.endDate, { zone: 'utc' }),
+            center,
+          );
         } else {
-          nextStart = DateTime.fromISO(oldStart, { zone: 'utc' }).plus({ minutes: 15 });
+          // If it's a shift or maintenance violation, jump to the next minute and let the helper find the next shift
+          const current = DateTime.fromISO(order.data.startDate, { zone: 'utc' });
+          nextStart = this.findNextAvailableStart(current.plus({ minutes: 1 }), center);
         }
 
         order.data.startDate = nextStart.toISO()!;
-        const endDtFromViolation = this.findEndDate(nextStart, order.data.durationMinutes, center);
-        order.data.endDate = endDtFromViolation.toISO()!;
+        order.data.endDate = this.findEndDate(
+          nextStart,
+          order.data.durationMinutes,
+          center,
+        ).toISO()!;
 
         changes.push(
           `[${center.docId}] Moved ${order.data.workOrderNumber} from ${oldStart} to ${order.data.startDate}`,
@@ -143,6 +157,43 @@ export class ReflowService {
       }
     }
     return sorted;
+  }
+
+  /**
+   * Ensures the proposed start date actually lands inside a shift.
+   * If it lands in the middle of the night/weekend, it "teleports" to the next shift start.
+   */
+  private static findNextAvailableStart(proposedStart: DateTime, center: WorkCenter): DateTime {
+    let current = proposedStart;
+
+    // We loop because we might jump to a day that has no shift (e.g., Saturday)
+    for (let i = 0; i < 7; i++) {
+      const dayOfWeek = current.weekday % 7;
+      const shift = center.data.shifts.find((s) => s.dayOfWeek === dayOfWeek);
+
+      if (shift) {
+        const shiftStart = current.set({
+          hour: shift.startHour,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
+        });
+        const shiftEnd = current.set({ hour: shift.endHour, minute: 0, second: 0, millisecond: 0 });
+
+        // If we are before the shift starts, jump to start
+        if (current < shiftStart) return shiftStart;
+
+        // If we are inside the shift, we are good to go!
+        if (current >= shiftStart && current < shiftEnd) return current;
+
+        // If we are at or after shift end, we must move to the next day...
+      }
+
+      // Move to 00:00 of the next day and check again
+      current = current.plus({ days: 1 }).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+    }
+
+    return current; // Safety fallback
   }
   private static findEndDate(start: DateTime, duration: number, center: WorkCenter): DateTime {
     let remainingMins = duration;
