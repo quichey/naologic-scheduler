@@ -86,10 +86,12 @@ export class ReflowService {
         : null;
 
       // Find the specific original cause for the logs
+      const checkForOriginalViolations =
+        (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) || prevOrderEndDate == null;
       const origViolation = originalViolations.find((v) => v.orderId === currOrder.docId);
       // 2. Logic Branching based on Cascade state
       if (hasCascade) {
-        if (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) {
+        if (checkForOriginalViolations) {
           // We aren't overlapping the previous order, but we might still hit maintenance
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
@@ -111,7 +113,7 @@ export class ReflowService {
         }
       } else {
         // No active cascade, checking for original sins
-        if (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) {
+        if (checkForOriginalViolations) {
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
