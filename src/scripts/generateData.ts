@@ -13,7 +13,31 @@ export class DataGenerator {
     return { mos, centers, orders };
   }
 
-  // Inside DataGenerator class...
+  /**
+   * Scenario: A perfectly sequenced schedule.
+   * 3 Orders: A -> B -> C, all on the same Work Center, no overlaps.
+   */
+  public static createPerfectScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    const orderA = this.createBaseOrder(uuidv4(), wcId);
+    orderA.data.startDate = '2026-02-09T08:00:00Z'; // Mon 8am
+    orderA.data.endDate = '2026-02-09T10:00:00Z'; // Mon 10am
+
+    const orderB = this.createBaseOrder(uuidv4(), wcId, [orderA.docId]);
+    orderB.data.startDate = '2026-02-09T10:00:00Z'; // Mon 10am
+    orderB.data.endDate = '2026-02-09T12:00:00Z'; // Mon 12pm
+
+    const orderC = this.createBaseOrder(uuidv4(), wcId, [orderB.docId]);
+    orderC.data.startDate = '2026-02-09T13:00:00Z'; // Mon 1pm (after lunch gap)
+    orderC.data.endDate = '2026-02-09T15:00:00Z'; // Mon 3pm
+
+    return {
+      orders: [orderA, orderB, orderC],
+      centers,
+    };
+  }
 
   /**
    * Scenario: Two Maintenance (fixed) orders overlap.
@@ -155,6 +179,10 @@ const run = () => {
     result = DataGenerator.createCircularScenario();
     filename = 'scenario-fatal-circular.json';
     console.log('⚠️ Generating Circular Dependency Scenario...');
+  } else if (scenarioArg === 'perfect') {
+    result = DataGenerator.createPerfectScenario();
+    filename = 'scenario-perfect.json';
+    console.log('✨ Generating Violation-Free Scenario...');
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');
