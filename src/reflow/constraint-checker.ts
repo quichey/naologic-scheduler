@@ -148,18 +148,50 @@ export class ConstraintChecker {
       const center = centers.find((c) => c.docId === order.data.workCenterId);
       if (!center) continue;
 
+      const start = DateTime.fromISO(order.data.startDate, { zone: 'utc' });
+      const end = DateTime.fromISO(order.data.endDate, { zone: 'utc' });
+
+      // 1. Existing check: Is the TOTAL duration correct?
       const actualMins = DateUtils.calculateWorkingMinutes(
         order.data.startDate,
         order.data.endDate,
         center,
       );
 
-      // Allowing a 1-minute buffer for rounding if necessary
       if (Math.abs(actualMins - order.data.durationMinutes) > 1) {
         violations.push({
           orderId: order.docId,
           type: 'OUTSIDE_SHIFT',
-          message: `Schedule mismatch: Needs ${order.data.durationMinutes}m of work, but time slot provides ${actualMins}m (after shifts/maintenance).`,
+          message: `Total work time mismatch: Needs ${order.data.durationMinutes}m, but provided window only allows for ${actualMins}m of shift time.`,
+          isFatal: false,
+        });
+      }
+
+      // 2. NEW check: Is the startDate actually inside a shift?
+      const isStartInShift = center.data.shifts.some(
+        (s) =>
+          s.dayOfWeek === start.weekday % 7 && start.hour >= s.startHour && start.hour < s.endHour,
+      );
+
+      if (!isStartInShift) {
+        violations.push({
+          orderId: order.docId,
+          type: 'OUTSIDE_SHIFT',
+          message: `Invalid Start: Work Order is scheduled to start at ${start.toFormat('HH:mm')} on a day/time with no active shift.`,
+          isFatal: false,
+        });
+      }
+
+      // 3. NEW check: Is the endDate actually inside a shift?
+      const isEndInShift = center.data.shifts.some(
+        (s) => s.dayOfWeek === end.weekday % 7 && end.hour > s.startHour && end.hour <= s.endHour,
+      );
+
+      if (!isEndInShift) {
+        violations.push({
+          orderId: order.docId,
+          type: 'OUTSIDE_SHIFT',
+          message: `Invalid End: Work Order is scheduled to end at ${end.toFormat('HH:mm')} on a day/time with no active shift.`,
           isFatal: false,
         });
       }
