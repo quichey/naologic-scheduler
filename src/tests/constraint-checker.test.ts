@@ -59,6 +59,22 @@ const runTests = () => {
       console.error('❌ An unknown error occurred:', err);
     }
   }
+  // --- Test Case 4: Perfect Schedule ---
+  try {
+    const { orders, centers } = loadScenario('scenario-perfect.json');
+    const violations = ConstraintChecker.verify(orders, centers);
+
+    assert.strictEqual(
+      violations.length,
+      0,
+      `Expected 0 violations, but found ${violations.length}`,
+    );
+    console.log('✅ Test Passed: Perfect schedule returned zero violations.');
+  } catch (err) {
+    if (err instanceof Error) {
+      console.error('❌ Test Failed (Perfect):', err.message);
+    }
+  }
 
   console.log('\n🏁 All tests completed.');
 };
