@@ -13,7 +13,8 @@
     "data:gen:invalid-end": "tsx src/scripts/generateData.ts --scenario=invalid-end",
     "data:gen:insufficient-time": "tsx src/scripts/generateData.ts --scenario=insufficient-time",
     "reflow": "tsx src/reflow/reflow.service.ts",
-    "test:constraint-checker": "tsx src/tests/constraint-checker.test.ts"
+    "test:constraint-checker": "tsx src/tests/constraint-checker.test.ts",
+    "test:reflow": "tsx src/tests/reflow.test.ts"
   },
   "repository": {
     "type": "git",

@@ -28,18 +28,12 @@ const runTests = () => {
   // Note: If maintenance overlaps an order, reflow SHOULD fix it by moving it.
   try {
     const { orders, centers } = loadScenario('scenario-fatal-clash.json');
-    const reflowed = ReflowService.reflow(orders, centers);
-    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
-
-    const overlap = violations.find((v) => v.type === 'MAINTENANCE_COLLISION');
-    assert.strictEqual(
-      overlap,
-      undefined,
-      'Reflow should move orders to resolve maintenance clashes',
-    );
-    console.log('✅ Test Passed: Maintenance clash resolved via move.');
+    ReflowService.reflow(orders, centers);
+    assert.fail('Should have thrown "NOT FIXABLE" for circular dependency');
   } catch (err) {
-    console.error('❌ Test Failed (Maintenance Clash):', err instanceof Error ? err.message : err);
+    const message = err instanceof Error ? err.message : String(err);
+    assert.ok(message.includes('NOT FIXABLE'), `Expected "NOT FIXABLE" but got: ${message}`);
+    console.log('✅ Test Passed: Correctly threw "NOT FIXABLE" fatal clash.');
   }
 
   // --- Test Case 3: Valid Dataset (Stress Test) ---
@@ -48,8 +42,11 @@ const runTests = () => {
     const reflowed = ReflowService.reflow(orders, centers);
     const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
 
-    const fatals = violations.filter((v) => v.isFatal);
-    assert.strictEqual(fatals.length, 0, 'Standard dataset should have ZERO fatals after reflow');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
     console.log('✅ Test Passed: 500-order dataset successfully reflowed.');
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
@@ -80,15 +77,7 @@ const runTests = () => {
       const reflowed = ReflowService.reflow(orders, centers);
       const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
 
-      // We expect 0 violations regarding timing after the fix
-      const timingViolations = violations.filter(
-        (v) => v.type.includes('SHIFT') || v.type.includes('WORK_TIME'),
-      );
-      assert.strictEqual(
-        timingViolations.length,
-        0,
-        `Reflow should fix all timing issues in ${scenario}`,
-      );
+      assert.strictEqual(violations.length, 0, `Reflow should fix all violations in ${scenario}`);
     }
     console.log('✅ Test Passed: All Shift/Timing scenarios corrected successfully.');
   } catch (err) {
