@@ -15,6 +15,7 @@
     "data:gen:single-chain": "tsx src/scripts/generateData.ts --scenario=single-chain",
     "data:gen:multi-parent": "tsx src/scripts/generateData.ts --scenario=multi-parent",
     "data:gen:multi-center": "tsx src/scripts/generateData.ts --scenario=multi-center",
+    "data:gen:sandwich": "tsx src/scripts/generateData.ts --scenario=sandwich",
     "reflow": "tsx src/reflow/reflow.service.ts",
     "test:constraint-checker": "tsx src/tests/constraint-checker.test.ts",
     "test:reflow": "tsx src/tests/reflow.test.ts"

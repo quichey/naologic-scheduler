@@ -1,0 +1,60 @@
+{
+  "orders": [
+    {
+      "docId": "1a2aba52-d662-46c1-a882-95bd14356e82",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "MAINT-TASK",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T09:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": true,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "5b06b91a-2224-473e-8254-c4a7fd04d555",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "THE-JUMPER",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    }
+  ],
+  "centers": [
+    {
+      "docId": "wc-1",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine A",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": [
+          {
+            "startDate": "2026-02-09T08:00:00Z",
+            "endDate": "2026-02-09T09:00:00Z",
+            "reason": "Static Cleaning"
+          }
+        ]
+      }
+    }
+  ]
+}

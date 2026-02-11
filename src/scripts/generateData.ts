@@ -14,6 +14,41 @@ export class DataGenerator {
   }
 
   /**
+   * Scenario: Work Center maintenance window and a maintenance work order close together.
+   */
+  public static createMaintenanceSandwichScenario(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    // 1. Static Window: 08:00 - 09:00
+    centers[0].data.maintenanceWindows = [
+      {
+        startDate: '2026-02-09T08:00:00Z',
+        endDate: '2026-02-09T09:00:00Z',
+        reason: 'Static Cleaning',
+      },
+    ];
+
+    // 2. Maintenance Work Order: 09:00 - 10:00
+    const maintOrder = this.createBaseOrder(uuidv4(), wcId);
+    maintOrder.data.workOrderNumber = 'MAINT-TASK';
+    maintOrder.data.isMaintenance = true;
+    maintOrder.data.startDate = '2026-02-09T09:00:00Z';
+    maintOrder.data.endDate = '2026-02-09T10:00:00Z';
+
+    // 3. Regular Order: Tries to start at 08:00
+    // Reflow should push this all the way to 10:00 AM
+    const regularOrder = this.createBaseOrder(uuidv4(), wcId);
+    regularOrder.data.workOrderNumber = 'THE-JUMPER';
+    regularOrder.data.startDate = '2026-02-09T08:00:00Z';
+
+    return { orders: [maintOrder, regularOrder], centers };
+  }
+
+  /**
    * Scenario: Parallel chains across multiple centers.
    * - WC-1: A 3-order chain with a 08:00 AM collision.
    * - WC-2: A 2-order chain starting inside a maintenance window.
@@ -419,6 +454,10 @@ const run = () => {
     result = DataGenerator.createMultiCenterDependencyScenario();
     filename = 'scenario-multi-center.json';
     console.log('🏢 Generating Multi-Center Parallel Chains Scenario...');
+  } else if (scenarioArg === 'sandwich') {
+    result = DataGenerator.createMaintenanceSandwichScenario();
+    filename = 'scenario-sandwich.json';
+    console.log('🥪 Generating Maintenance Sandwich (Window + Order) Scenario...');
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');
