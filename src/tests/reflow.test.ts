@@ -4,10 +4,37 @@ import path from 'node:path';
 import { ConstraintChecker } from '../reflow/constraint-checker.js';
 import { ReflowService } from '../reflow/reflow.service.js';
 import type { ReflowedSchedule } from '../reflow/reflow.service.js';
+import type { Violation } from '../reflow/constraint-checker.js';
 
 const loadScenario = (filename: string) => {
   const filePath = path.join(process.cwd(), 'src', 'data', filename);
   return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+};
+
+const debugHelper = (
+  violationsAfter: Violation[],
+  reflowed: ReflowedSchedule,
+  debug_file = null,
+) => {
+  if (violationsAfter.length > 0) {
+    const debugPath = debug_file
+      ? debug_file
+      : path.join(process.cwd(), 'debug-reflow-results.json');
+    fs.writeFileSync(
+      debugPath,
+      JSON.stringify(
+        {
+          violations: violationsAfter,
+          updatedOrders: reflowed.updatedWorkOrders,
+        },
+        null,
+        2,
+      ),
+    );
+
+    console.log(`⚠️ Violations remained. Debug file saved to: ${debugPath}`);
+    console.log('Top Violation Types:', [...new Set(violationsAfter.map((v) => v.type))]);
+  }
 };
 
 const runTests = () => {
@@ -78,23 +105,7 @@ const runTests = () => {
     console.log(`[10 Orders] Violations Before: ${violationsBefore.length}`);
     console.log(`[10 Orders] Violations After: ${violationsAfter.length}`);
 
-    if (violationsAfter.length > 0) {
-      const debugPath = path.join(process.cwd(), 'debug-reflow-results.json');
-      fs.writeFileSync(
-        debugPath,
-        JSON.stringify(
-          {
-            violations: violationsAfter,
-            updatedOrders: reflowed.updatedWorkOrders,
-          },
-          null,
-          2,
-        ),
-      );
-
-      console.log(`⚠️ Violations remained. Debug file saved to: ${debugPath}`);
-      console.log('Top Violation Types:', [...new Set(violationsAfter.map((v) => v.type))]);
-    }
+    debugHelper(violationsAfter, reflowed);
 
     assert.strictEqual(violationsAfter.length, 0, 'Should have zero violations');
   } catch (err) {
@@ -112,7 +123,7 @@ const runTests = () => {
       0,
       'Standard dataset should have ZERO violations after reflow',
     );
-    console.log('✅ Test Passed: 100-order dataset successfully reflowed.');
+    console.log('✅ Test Passed: 10-order single center dataset successfully reflowed.');
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }
