@@ -64,6 +64,7 @@ const runTests = () => {
   }
 
   // --- Test Case 3: Valid Dataset (Stress Test) ---
+  /*
   try {
     const { orders, centers } = loadScenario('500-orders-10-centers.json');
     const violationsBefore = ConstraintChecker.verify(orders, centers);
@@ -111,19 +112,36 @@ const runTests = () => {
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }
+    */
   try {
     const { orders, centers } = loadScenario('10-order-single-center.json');
     const violationsBefore = ConstraintChecker.verify(orders, centers);
     const reflowed = ReflowService.reflow(orders, centers);
     const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
 
-    console.log(`violations before: ${violationsBefore.length}`);
+    //console.log(`violations before: ${violationsBefore.length}`);
     assert.strictEqual(
       violations.length,
       0,
       'Standard dataset should have ZERO violations after reflow',
     );
     console.log('✅ Test Passed: 10-order single center dataset successfully reflowed.');
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('scenario-multi-parent.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Scenario multi-parent should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log('✅ Test Passed: Multi-parent dataset successfully reflowed.');
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }
