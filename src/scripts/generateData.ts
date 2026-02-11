@@ -14,6 +14,39 @@ export class DataGenerator {
   }
 
   /**
+   * Scenario: Multi-parent dependency (Convergence).
+   * WO-C depends on BOTH WO-A and WO-B.
+   * Tests if the reflow engine waits for the LATEST parent to finish.
+   */
+  public static createMultiParentScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    // Order A: Ends at 10:00 AM
+    const orderA = this.createBaseOrder(uuidv4(), wcId);
+    orderA.data.workOrderNumber = 'WO-A';
+    orderA.data.startDate = '2026-02-09T08:00:00Z';
+    orderA.data.endDate = '2026-02-09T10:00:00Z';
+
+    // Order B: Ends at 12:00 PM (The "Bottle-neck" parent)
+    const orderB = this.createBaseOrder(uuidv4(), wcId);
+    orderB.data.workOrderNumber = 'WO-B';
+    orderB.data.startDate = '2026-02-09T08:00:00Z';
+    orderB.data.endDate = '2026-02-09T12:00:00Z';
+
+    // Order C: Depends on A AND B.
+    // It should be reflowed to start at 12:00 PM (after B), not 10:00 AM (after A).
+    const orderC = this.createBaseOrder(uuidv4(), wcId, [orderA.docId, orderB.docId]);
+    orderC.data.workOrderNumber = 'WO-C';
+    orderC.data.startDate = '2026-02-09T08:00:00Z'; // Overlaps parents intentionally
+
+    return {
+      orders: [orderA, orderB, orderC],
+      centers,
+    };
+  }
+
+  /**
    * Scenario: High-density dependency chains on a single center.
    * Useful for testing "Time Walking" and "Maintenance Jumping" logic
    * without cross-center complexity.
@@ -324,6 +357,10 @@ const run = () => {
     result = DataGenerator.createSingleCenterDependencyScenario(orderCount);
     filename = `${orderCount}-order-single-center.json`;
     console.log(`⛓️ Generating Single Center Chain: ${orderCount} orders on 1 center...`);
+  } else if (scenarioArg === 'multi-parent') {
+    result = DataGenerator.createMultiParentScenario();
+    filename = 'scenario-multi-parent.json';
+    console.log('🧬 Generating Multi-Parent Convergence Scenario...');
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');

@@ -13,6 +13,7 @@
     "data:gen:invalid-end": "tsx src/scripts/generateData.ts --scenario=invalid-end",
     "data:gen:insufficient-time": "tsx src/scripts/generateData.ts --scenario=insufficient-time",
     "data:gen:single-chain": "tsx src/scripts/generateData.ts --scenario=single-chain",
+    "data:gen:multi-parent": "tsx src/scripts/generateData.ts --scenario=multi-parent",
     "reflow": "tsx src/reflow/reflow.service.ts",
     "test:constraint-checker": "tsx src/tests/constraint-checker.test.ts",
     "test:reflow": "tsx src/tests/reflow.test.ts"
