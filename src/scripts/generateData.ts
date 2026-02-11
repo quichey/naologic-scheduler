@@ -254,6 +254,76 @@ export class DataGenerator {
     return { orders: [order], centers };
   }
   /**
+   * Scenario: The Kitchen Sink (Robustness Test)
+   * * This scenario validates the engine's ability to resolve multiple
+   * overlapping constraints simultaneously across different work centers.
+   * * DISTINCT CASES COVERED:
+   * 1. THE SANDWICH (WC1):
+   * Combines a Static Maintenance Window (08:00-09:00) with a Fixed
+   * Maintenance Work Order (09:00-10:00) to create a single 2-hour block.
+   * * 2. SHIFT BOUNDARY VIOLATIONS (WC2):
+   * Orders are scheduled to start at 06:00 AM, but the Work Center shift
+   * does not begin until 08:00 AM.
+   * * 3. MULTI-PARENT CONVERGENCE (WC2):
+   * Order 'C2-C' depends on both 'C2-A' and 'C2-B'. The engine must
+   * delay 'C2-C' until the LATEST parent finishes.
+   * * 4. DISJOINT MULTI-CENTER SCHEDULING:
+   * Processes two distinct Work Centers in a single pass, ensuring that
+   * violations in WC1 do not bleed into or corrupt the logic for WC2.
+   */
+  public static createComplexRobustnessScenario(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(2);
+    const wc1 = centers[0].docId; // Machine A
+    const wc2 = centers[1].docId; // Machine B
+
+    // --- WORK CENTER 1: THE MAINTENANCE SANDWICH + INTRA-CENTER CHAIN ---
+    centers[0].data.maintenanceWindows = [
+      {
+        startDate: '2026-02-09T08:00:00Z',
+        endDate: '2026-02-09T09:00:00Z',
+        reason: 'Morning Calibration',
+      },
+    ];
+
+    const wc1MaintOrder = this.createBaseOrder(uuidv4(), wc1);
+    wc1MaintOrder.data.workOrderNumber = 'WC1-FIXED-MAINT';
+    wc1MaintOrder.data.isMaintenance = true;
+    wc1MaintOrder.data.startDate = '2026-02-09T09:00:00Z';
+    wc1MaintOrder.data.endDate = '2026-02-09T10:00:00Z';
+
+    const c1_A = this.createBaseOrder(uuidv4(), wc1);
+    c1_A.data.workOrderNumber = 'C1-A';
+    c1_A.data.startDate = '2026-02-09T08:00:00Z';
+    c1_A.data.durationMinutes = 60;
+
+    const c1_B = this.createBaseOrder(uuidv4(), wc1, [c1_A.docId]);
+    c1_B.data.workOrderNumber = 'C1-B';
+    c1_B.data.startDate = '2026-02-09T08:00:00Z';
+
+    // --- WORK CENTER 2: SHIFT BOUNDARIES + MULTI-PARENT CONVERGENCE ---
+    const c2_A = this.createBaseOrder(uuidv4(), wc2);
+    c2_A.data.workOrderNumber = 'C2-A';
+    c2_A.data.startDate = '2026-02-09T06:00:00Z'; // 2h before shift
+    c2_A.data.durationMinutes = 60;
+
+    const c2_B = this.createBaseOrder(uuidv4(), wc2);
+    c2_B.data.workOrderNumber = 'C2-B';
+    c2_B.data.startDate = '2026-02-09T06:00:00Z'; // 2h before shift
+    c2_B.data.durationMinutes = 120;
+
+    const c2_C = this.createBaseOrder(uuidv4(), wc2, [c2_A.docId, c2_B.docId]);
+    c2_C.data.workOrderNumber = 'C2-C-CONVERGE';
+    c2_C.data.startDate = '2026-02-09T08:00:00Z';
+
+    return {
+      orders: [wc1MaintOrder, c1_A, c1_B, c2_A, c2_B, c2_C],
+      centers,
+    };
+  }
+  /**
    * Scenario: A perfectly sequenced schedule.
    * 3 Orders: A -> B -> C, all on the same Work Center, no overlaps.
    */
@@ -458,6 +528,11 @@ const run = () => {
     result = DataGenerator.createMaintenanceSandwichScenario();
     filename = 'scenario-sandwich.json';
     console.log('🥪 Generating Maintenance Sandwich (Window + Order) Scenario...');
+  } else if (scenarioArg === 'robustness') {
+    result = DataGenerator.createComplexRobustnessScenario();
+    filename = 'scenario-robustness-test.json';
+    console.log('🧪 Generating Complex Robustness Scenario...');
+    console.log('   - Testing: Sandwich, Shift Boundaries, Convergence, and Center Isolation.');
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');
