@@ -14,6 +14,128 @@ export class DataGenerator {
   }
 
   /**
+   * Scenario: Work Center maintenance window and a maintenance work order close together.
+   */
+  public static createMaintenanceSandwichScenario(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    // 1. Static Window: 08:00 - 09:00
+    centers[0].data.maintenanceWindows = [
+      {
+        startDate: '2026-02-09T08:00:00Z',
+        endDate: '2026-02-09T09:00:00Z',
+        reason: 'Static Cleaning',
+      },
+    ];
+
+    // 2. Maintenance Work Order: 09:00 - 10:00
+    const maintOrder = this.createBaseOrder(uuidv4(), wcId);
+    maintOrder.data.workOrderNumber = 'MAINT-TASK';
+    maintOrder.data.isMaintenance = true;
+    maintOrder.data.startDate = '2026-02-09T09:00:00Z';
+    maintOrder.data.endDate = '2026-02-09T10:00:00Z';
+
+    // 3. Regular Order: Tries to start at 08:00
+    // Reflow should push this all the way to 10:00 AM
+    const regularOrder = this.createBaseOrder(uuidv4(), wcId);
+    regularOrder.data.workOrderNumber = 'THE-JUMPER';
+    regularOrder.data.startDate = '2026-02-09T08:00:00Z';
+
+    return { orders: [maintOrder, regularOrder], centers };
+  }
+
+  /**
+   * Scenario: Parallel chains across multiple centers.
+   * - WC-1: A 3-order chain with a 08:00 AM collision.
+   * - WC-2: A 2-order chain starting inside a maintenance window.
+   * - WC-3: A single maintenance order (fixed) and a child WO that overlaps it.
+   */
+  public static createMultiCenterDependencyScenario(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(3);
+    const mos = this.generateMOs(3);
+    const orders: WorkOrder[] = [];
+
+    // --- Center 1: The "Standard" Chain ---
+    const wc1 = centers[0].docId;
+    const c1_a = this.createBaseOrder(uuidv4(), wc1);
+    c1_a.data.workOrderNumber = 'C1-A';
+    // Child B depends on A
+    const c1_b = this.createBaseOrder(uuidv4(), wc1, [c1_a.docId]);
+    c1_b.data.workOrderNumber = 'C1-B';
+    // All start at 8am (Violation: Overlap)
+    orders.push(c1_a, c1_b);
+
+    // --- Center 2: The "Maintenance Jump" Chain ---
+    const wc2 = centers[1].docId;
+    centers[1].data.maintenanceWindows = [
+      {
+        startDate: '2026-02-09T08:00:00Z',
+        endDate: '2026-02-09T10:00:00Z',
+        reason: 'Morning Calibration',
+      },
+    ];
+    const c2_a = this.createBaseOrder(uuidv4(), wc2);
+    c2_a.data.workOrderNumber = 'C2-A';
+    c2_a.data.startDate = '2026-02-09T08:00:00Z'; // Violation: Maintenance Collision
+    const c2_b = this.createBaseOrder(uuidv4(), wc2, [c2_a.docId]);
+    c2_b.data.workOrderNumber = 'C2-B';
+    orders.push(c2_a, c2_b);
+
+    // --- Center 3: The "Fixed Maintenance" Constraint ---
+    const wc3 = centers[2].docId;
+    const c3_maint = this.createBaseOrder(uuidv4(), wc3);
+    c3_maint.data.workOrderNumber = 'C3-FIXED';
+    c3_maint.data.isMaintenance = true; // CANNOT BE MOVED
+
+    const c3_child = this.createBaseOrder(uuidv4(), wc3, [c3_maint.docId]);
+    c3_child.data.workOrderNumber = 'C3-CHILD';
+    c3_child.data.startDate = '2026-02-09T08:00:00Z'; // Violation: Overlap with fixed order
+    orders.push(c3_maint, c3_child);
+
+    return { orders, centers };
+  }
+
+  /**
+   * Scenario: Multi-parent dependency (Convergence).
+   * WO-C depends on BOTH WO-A and WO-B.
+   * Tests if the reflow engine waits for the LATEST parent to finish.
+   */
+  public static createMultiParentScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const wcId = centers[0].docId;
+
+    // Order A: Ends at 10:00 AM
+    const orderA = this.createBaseOrder(uuidv4(), wcId);
+    orderA.data.workOrderNumber = 'WO-A';
+    orderA.data.startDate = '2026-02-09T08:00:00Z';
+    orderA.data.endDate = '2026-02-09T10:00:00Z';
+
+    // Order B: Ends at 12:00 PM (The "Bottle-neck" parent)
+    const orderB = this.createBaseOrder(uuidv4(), wcId);
+    orderB.data.workOrderNumber = 'WO-B';
+    orderB.data.startDate = '2026-02-09T08:00:00Z';
+    orderB.data.endDate = '2026-02-09T12:00:00Z';
+
+    // Order C: Depends on A AND B.
+    // It should be reflowed to start at 12:00 PM (after B), not 10:00 AM (after A).
+    const orderC = this.createBaseOrder(uuidv4(), wcId, [orderA.docId, orderB.docId]);
+    orderC.data.workOrderNumber = 'WO-C';
+    orderC.data.startDate = '2026-02-09T08:00:00Z'; // Overlaps parents intentionally
+
+    return {
+      orders: [orderA, orderB, orderC],
+      centers,
+    };
+  }
+
+  /**
    * Scenario: High-density dependency chains on a single center.
    * Useful for testing "Time Walking" and "Maintenance Jumping" logic
    * without cross-center complexity.
@@ -130,6 +252,76 @@ export class DataGenerator {
     order.data.durationMinutes = 120;
 
     return { orders: [order], centers };
+  }
+  /**
+   * Scenario: The Kitchen Sink (Robustness Test)
+   * * This scenario validates the engine's ability to resolve multiple
+   * overlapping constraints simultaneously across different work centers.
+   * * DISTINCT CASES COVERED:
+   * 1. THE SANDWICH (WC1):
+   * Combines a Static Maintenance Window (08:00-09:00) with a Fixed
+   * Maintenance Work Order (09:00-10:00) to create a single 2-hour block.
+   * * 2. SHIFT BOUNDARY VIOLATIONS (WC2):
+   * Orders are scheduled to start at 06:00 AM, but the Work Center shift
+   * does not begin until 08:00 AM.
+   * * 3. MULTI-PARENT CONVERGENCE (WC2):
+   * Order 'C2-C' depends on both 'C2-A' and 'C2-B'. The engine must
+   * delay 'C2-C' until the LATEST parent finishes.
+   * * 4. DISJOINT MULTI-CENTER SCHEDULING:
+   * Processes two distinct Work Centers in a single pass, ensuring that
+   * violations in WC1 do not bleed into or corrupt the logic for WC2.
+   */
+  public static createComplexRobustnessScenario(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(2);
+    const wc1 = centers[0].docId; // Machine A
+    const wc2 = centers[1].docId; // Machine B
+
+    // --- WORK CENTER 1: THE MAINTENANCE SANDWICH + INTRA-CENTER CHAIN ---
+    centers[0].data.maintenanceWindows = [
+      {
+        startDate: '2026-02-09T08:00:00Z',
+        endDate: '2026-02-09T09:00:00Z',
+        reason: 'Morning Calibration',
+      },
+    ];
+
+    const wc1MaintOrder = this.createBaseOrder(uuidv4(), wc1);
+    wc1MaintOrder.data.workOrderNumber = 'WC1-FIXED-MAINT';
+    wc1MaintOrder.data.isMaintenance = true;
+    wc1MaintOrder.data.startDate = '2026-02-09T09:00:00Z';
+    wc1MaintOrder.data.endDate = '2026-02-09T10:00:00Z';
+
+    const c1_A = this.createBaseOrder(uuidv4(), wc1);
+    c1_A.data.workOrderNumber = 'C1-A';
+    c1_A.data.startDate = '2026-02-09T08:00:00Z';
+    c1_A.data.durationMinutes = 60;
+
+    const c1_B = this.createBaseOrder(uuidv4(), wc1, [c1_A.docId]);
+    c1_B.data.workOrderNumber = 'C1-B';
+    c1_B.data.startDate = '2026-02-09T08:00:00Z';
+
+    // --- WORK CENTER 2: SHIFT BOUNDARIES + MULTI-PARENT CONVERGENCE ---
+    const c2_A = this.createBaseOrder(uuidv4(), wc2);
+    c2_A.data.workOrderNumber = 'C2-A';
+    c2_A.data.startDate = '2026-02-09T06:00:00Z'; // 2h before shift
+    c2_A.data.durationMinutes = 60;
+
+    const c2_B = this.createBaseOrder(uuidv4(), wc2);
+    c2_B.data.workOrderNumber = 'C2-B';
+    c2_B.data.startDate = '2026-02-09T06:00:00Z'; // 2h before shift
+    c2_B.data.durationMinutes = 120;
+
+    const c2_C = this.createBaseOrder(uuidv4(), wc2, [c2_A.docId, c2_B.docId]);
+    c2_C.data.workOrderNumber = 'C2-C-CONVERGE';
+    c2_C.data.startDate = '2026-02-09T08:00:00Z';
+
+    return {
+      orders: [wc1MaintOrder, c1_A, c1_B, c2_A, c2_B, c2_C],
+      centers,
+    };
   }
   /**
    * Scenario: A perfectly sequenced schedule.
@@ -324,6 +516,23 @@ const run = () => {
     result = DataGenerator.createSingleCenterDependencyScenario(orderCount);
     filename = `${orderCount}-order-single-center.json`;
     console.log(`⛓️ Generating Single Center Chain: ${orderCount} orders on 1 center...`);
+  } else if (scenarioArg === 'multi-parent') {
+    result = DataGenerator.createMultiParentScenario();
+    filename = 'scenario-multi-parent.json';
+    console.log('🧬 Generating Multi-Parent Convergence Scenario...');
+  } else if (scenarioArg === 'multi-center') {
+    result = DataGenerator.createMultiCenterDependencyScenario();
+    filename = 'scenario-multi-center.json';
+    console.log('🏢 Generating Multi-Center Parallel Chains Scenario...');
+  } else if (scenarioArg === 'sandwich') {
+    result = DataGenerator.createMaintenanceSandwichScenario();
+    filename = 'scenario-sandwich.json';
+    console.log('🥪 Generating Maintenance Sandwich (Window + Order) Scenario...');
+  } else if (scenarioArg === 'robustness') {
+    result = DataGenerator.createComplexRobustnessScenario();
+    filename = 'scenario-robustness-test.json';
+    console.log('🧪 Generating Complex Robustness Scenario...');
+    console.log('   - Testing: Sandwich, Shift Boundaries, Convergence, and Center Isolation.');
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');

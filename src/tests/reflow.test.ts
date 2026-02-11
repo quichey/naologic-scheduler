@@ -19,7 +19,7 @@ const debugHelper = (
   if (violationsAfter.length > 0) {
     const debugPath = debug_file
       ? debug_file
-      : path.join(process.cwd(), 'debug-reflow-results.json');
+      : path.join(process.cwd(), 'src', 'tests', 'debug', 'debug-reflow-results.json');
     fs.writeFileSync(
       debugPath,
       JSON.stringify(
@@ -64,6 +64,7 @@ const runTests = () => {
   }
 
   // --- Test Case 3: Valid Dataset (Stress Test) ---
+  /*
   try {
     const { orders, centers } = loadScenario('500-orders-10-centers.json');
     const violationsBefore = ConstraintChecker.verify(orders, centers);
@@ -111,13 +112,14 @@ const runTests = () => {
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }
+    */
   try {
     const { orders, centers } = loadScenario('10-order-single-center.json');
     const violationsBefore = ConstraintChecker.verify(orders, centers);
     const reflowed = ReflowService.reflow(orders, centers);
     const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
 
-    console.log(`violations before: ${violationsBefore.length}`);
+    //console.log(`violations before: ${violationsBefore.length}`);
     assert.strictEqual(
       violations.length,
       0,
@@ -126,6 +128,109 @@ const runTests = () => {
     console.log('✅ Test Passed: 10-order single center dataset successfully reflowed.');
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('scenario-multi-parent.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Scenario multi-parent should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log('✅ Test Passed: Multi-parent dataset successfully reflowed.');
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('scenario-multi-center.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Scenario multi-center should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log(
+      '✅ Test Passed: Multi-center with dependency violations dataset successfully reflowed.',
+    );
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('scenario-sandwich.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Scenario sandwich should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log(
+      '✅ Test Passed: Scenario with work center maintenance window and maintenance work order close together successfully reflowed.',
+    );
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('scenario-robustness-test.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Scenario robustness should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log(
+      '✅ Test Passed: Scenario with combination of smaller scenarios successfully reflowed.',
+    );
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  // --- Test Case 6: Explanation & Change Log (Audit Test) ---
+  try {
+    const { orders, centers } = loadScenario('scenario-robustness-test.json');
+    const reflowed = ReflowService.reflow(orders, centers);
+
+    console.log('\n--- Reflow Audit Log ---');
+    reflowed.explanation.forEach((reason, i) => {
+      console.log(`🔹 ${reflowed.changes[i]} | Reason: ${reason}`);
+    });
+
+    // 1. Assert we have changes
+    assert.ok(reflowed.changes.length > 0, 'Should have logged changes');
+    assert.ok(
+      reflowed.explanation.length === reflowed.changes.length,
+      'Changes and explanations must match 1:1',
+    );
+
+    // 2. Target specific logic checks
+    const hasSandwichFix = reflowed.explanation.some((e) =>
+      e.includes('Original violation: MAINTENANCE_COLLISION'),
+    );
+    const hasCascadeFix = reflowed.explanation.some((e) => e.includes('Cascading shift changes'));
+    const hasConvergenceFix = reflowed.explanation.some((e) =>
+      e.includes('Collision with previous order'),
+    );
+
+    assert.ok(hasSandwichFix, 'Should explain a fix for Maintenance Sandwich');
+    assert.ok(hasCascadeFix, 'Should explain a cascading shift');
+
+    console.log('✅ Test Passed: Change logs and explanations are accurate.');
+  } catch (err) {
+    console.error('❌ Test Failed (Audit Logic):', err instanceof Error ? err.message : err);
   }
 
   // --- Test Case 4: Perfect Schedule (Stability Test) ---

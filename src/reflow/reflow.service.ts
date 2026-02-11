@@ -96,7 +96,9 @@ export class ReflowService {
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
-            changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+            changes.push(
+              `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+            );
 
             const reason = `Original violation: ${origViolation.type}`;
             explanation.push(reason);
@@ -108,7 +110,9 @@ export class ReflowService {
           // Overlap detected due to a previous move
           const newStart = this.findNextAvailableStart(prevOrderEndDate!, center, allOrders);
           this.applyShift(currOrder, newStart, center, allOrders);
-          changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+          changes.push(
+            `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+          );
           explanation.push(`Cascading shift changes due to earlier violations`);
         }
       } else {
@@ -117,7 +121,9 @@ export class ReflowService {
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
-            changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+            changes.push(
+              `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+            );
 
             const reason = `Original violation: ${origViolation.type}`;
             explanation.push(reason);
@@ -135,7 +141,9 @@ export class ReflowService {
             ? `Original violation: ${origViolation.type}`
             : `Collision with previous order ${prevOrder?.data.workOrderNumber}`;
 
-          changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+          changes.push(
+            `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+          );
           explanation.push(reason);
           hasCascade = true;
         }
@@ -202,7 +210,8 @@ export class ReflowService {
   }
   /**
    * Finds the first valid minute for an order to start.
-   * It must be within a WorkCenter shift AND not overlapping a Maintenance Work Order.
+   * It must be within a WorkCenter shift AND not overlapping
+   * a Maintenance Work Order OR a static Maintenance Window.
    */
   private static findNextAvailableStart(
     proposedStart: DateTime,
@@ -212,19 +221,17 @@ export class ReflowService {
     let current = proposedStart;
     let foundValidStart = false;
 
-    // Filter maintenance orders for this specific center once to optimize
-    const maintenance = allOrders.filter(
+    // Filter maintenance orders once
+    const maintenanceOrders = allOrders.filter(
       (o) => o.data.isMaintenance && o.data.workCenterId === center.docId,
     );
 
-    // We keep checking until we find a time that satisfies both Shift and Maintenance constraints
     while (!foundValidStart) {
       const dayOfWeek = current.weekday % 7;
       const shift = center.data.shifts.find((s) => s.dayOfWeek === dayOfWeek);
 
       // --- 1. Shift Check ---
       if (!shift) {
-        // No shift today, jump to start of tomorrow
         current = current.plus({ days: 1 }).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
         continue;
       }
@@ -239,33 +246,46 @@ export class ReflowService {
 
       if (current < shiftStart) {
         current = shiftStart;
-        // Re-check this new time against maintenance
       } else if (current >= shiftEnd) {
-        // Past today's shift, jump to tomorrow
         current = current.plus({ days: 1 }).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
         continue;
       }
 
-      // --- 2. Maintenance Check ---
-      // Find any maintenance block that currently "swallows" our proposed start time
-      const blocker = maintenance.find((m) => {
+      // --- 2. Combined Maintenance Check (Orders + Windows) ---
+
+      // Check for Maintenance Work Orders
+      const orderBlocker = maintenanceOrders.find((m) => {
         const mStart = DateTime.fromISO(m.data.startDate, { zone: 'utc' });
         const mEnd = DateTime.fromISO(m.data.endDate, { zone: 'utc' });
         return current >= mStart && current < mEnd;
       });
 
-      if (blocker) {
-        // Collision! Jump to the end of the maintenance and loop again to re-check shifts
-        current = DateTime.fromISO(blocker.data.endDate, { zone: 'utc' });
+      // Check for Static Maintenance Windows
+      const windowBlocker = center.data.maintenanceWindows.find((w) => {
+        const wStart = DateTime.fromISO(w.startDate, { zone: 'utc' });
+        const wEnd = DateTime.fromISO(w.endDate, { zone: 'utc' });
+        return current >= wStart && current < wEnd;
+      });
+
+      if (orderBlocker) {
+        current = DateTime.fromISO(orderBlocker.data.endDate, { zone: 'utc' });
         continue;
       }
 
-      // If we got here, we are inside a shift and not in maintenance
+      if (windowBlocker) {
+        current = DateTime.fromISO(windowBlocker.endDate, { zone: 'utc' });
+        continue;
+      }
+
       foundValidStart = true;
     }
 
     return current;
   }
+  /**
+   * Calculates the end date by "walking" through available shift minutes,
+   * skipping over Maintenance Orders and Maintenance Windows.
+   */
   private static findEndDate(
     start: DateTime,
     duration: number,
@@ -275,9 +295,19 @@ export class ReflowService {
     let remainingMins = duration;
     let current = start;
 
-    const maintenance = allOrders.filter(
-      (o) => o.data.isMaintenance && o.data.workCenterId === center.docId,
-    );
+    // Create a unified list of "time-blocks" to skip
+    const obstacles = [
+      ...center.data.maintenanceWindows.map((w) => ({
+        start: DateTime.fromISO(w.startDate, { zone: 'utc' }),
+        end: DateTime.fromISO(w.endDate, { zone: 'utc' }),
+      })),
+      ...allOrders
+        .filter((o) => o.data.isMaintenance && o.data.workCenterId === center.docId)
+        .map((o) => ({
+          start: DateTime.fromISO(o.data.startDate, { zone: 'utc' }),
+          end: DateTime.fromISO(o.data.endDate, { zone: 'utc' }),
+        })),
+    ];
 
     while (remainingMins > 0) {
       const dayOfWeek = current.weekday % 7;
@@ -286,39 +316,34 @@ export class ReflowService {
       if (shift) {
         const shiftEnd = current.set({ hour: shift.endHour, minute: 0, second: 0, millisecond: 0 });
 
-        // 1. Find any maintenance that starts between 'current' and 'shiftEnd'
-        const nextMaintenance = maintenance
-          .map((m) => ({
-            start: DateTime.fromISO(m.data.startDate, { zone: 'utc' }),
-            end: DateTime.fromISO(m.data.endDate, { zone: 'utc' }),
-          }))
-          .filter((m) => m.start >= current && m.start < shiftEnd)
+        // Find the next obstacle starting within this shift
+        const nextObstacle = obstacles
+          .filter((obs) => obs.start >= current && obs.start < shiftEnd)
           .sort((a, b) => a.start.toMillis() - b.start.toMillis())[0];
 
-        // 2. Determine the "Next Deadline" (either the shift end or the next maintenance start)
-        const nextObstacle = nextMaintenance ? nextMaintenance.start : shiftEnd;
-        const minutesAvailable = nextObstacle.diff(current, 'minutes').minutes;
+        // The next point where work MUST stop
+        const nextDeadline = nextObstacle ? nextObstacle.start : shiftEnd;
+        const minutesAvailable = nextDeadline.diff(current, 'minutes').minutes;
 
         if (minutesAvailable > 0) {
           if (remainingMins <= minutesAvailable) {
-            // We finish before the next obstacle!
+            // Success! The order fits in the current available block
             return current.plus({ minutes: remainingMins });
           } else {
-            // Consume available time and jump to the obstacle
+            // Consume the available time and jump to the obstacle/shift-end
             remainingMins -= minutesAvailable;
-            current = nextObstacle;
+            current = nextDeadline;
           }
         }
 
-        // 3. Handle Obstacle Jumping
-        if (nextMaintenance && current.equals(nextMaintenance.start)) {
-          // We hit maintenance! Jump to the end of it and continue the loop
-          current = nextMaintenance.end;
-          continue; // Re-check if we are still within shift or if maintenance pushed us out
+        // If we reached a maintenance obstacle, jump to the end of it
+        if (nextObstacle && current.equals(nextObstacle.start)) {
+          current = nextObstacle.end;
+          continue; // Re-check if the new current time is still within shift
         }
       }
 
-      // 4. If we are at shift end or in a non-working period, jump to next shift start
+      // If we are at shift end, jump to the start of the next day's shift
       current = current.plus({ days: 1 }).set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
       const nextDayShift = center.data.shifts.find((s) => s.dayOfWeek === current.weekday % 7);
       if (nextDayShift) {

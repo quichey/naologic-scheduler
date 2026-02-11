@@ -1,0 +1,162 @@
+{
+  "orders": [
+    {
+      "docId": "cb60570f-6143-4ab9-9afd-bead65a70821",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C1-A",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "71611daf-76b2-4fef-8e29-159b980c8cce",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C1-B",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "cb60570f-6143-4ab9-9afd-bead65a70821"
+        ]
+      }
+    },
+    {
+      "docId": "c51210ee-cd4b-40b9-b302-23f52097bb6f",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C2-A",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-2",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "be0e116f-b538-4b7f-9384-da69e3bfef64",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C2-B",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-2",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "c51210ee-cd4b-40b9-b302-23f52097bb6f"
+        ]
+      }
+    },
+    {
+      "docId": "ead6cab7-6d24-4361-982f-2e98a29691f1",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C3-FIXED",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-3",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": true,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "d23d2863-04fe-492d-8e4a-b16a71ba3268",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C3-CHILD",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-3",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "ead6cab7-6d24-4361-982f-2e98a29691f1"
+        ]
+      }
+    }
+  ],
+  "centers": [
+    {
+      "docId": "wc-1",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine A",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": []
+      }
+    },
+    {
+      "docId": "wc-2",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine B",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": [
+          {
+            "startDate": "2026-02-09T08:00:00Z",
+            "endDate": "2026-02-09T10:00:00Z",
+            "reason": "Morning Calibration"
+          }
+        ]
+      }
+    },
+    {
+      "docId": "wc-3",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine C",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": []
+      }
+    }
+  ]
+}

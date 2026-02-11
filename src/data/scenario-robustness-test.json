@@ -1,0 +1,141 @@
+{
+  "orders": [
+    {
+      "docId": "9601e6ca-89e0-4e70-9bb2-0b813d103be0",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WC1-FIXED-MAINT",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T09:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": true,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "b739bf32-4440-4b64-8802-d08d8881a898",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C1-A",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "cfcb1a59-7b09-44af-8f48-99c75d449656",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C1-B",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "b739bf32-4440-4b64-8802-d08d8881a898"
+        ]
+      }
+    },
+    {
+      "docId": "7da7c0d8-bbf4-412f-b881-0b974b109575",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C2-A",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-2",
+        "startDate": "2026-02-09T06:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "ba5dd120-f9c1-4ec8-b445-9dc3249396b8",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C2-B",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-2",
+        "startDate": "2026-02-09T06:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "1d706b16-9d11-493f-8f9e-fa46eb8e1916",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "C2-C-CONVERGE",
+        "manufacturingOrderId": "mo-1",
+        "workCenterId": "wc-2",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T10:00:00Z",
+        "durationMinutes": 120,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "7da7c0d8-bbf4-412f-b881-0b974b109575",
+          "ba5dd120-f9c1-4ec8-b445-9dc3249396b8"
+        ]
+      }
+    }
+  ],
+  "centers": [
+    {
+      "docId": "wc-1",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine A",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": [
+          {
+            "startDate": "2026-02-09T08:00:00Z",
+            "endDate": "2026-02-09T09:00:00Z",
+            "reason": "Morning Calibration"
+          }
+        ]
+      }
+    },
+    {
+      "docId": "wc-2",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine B",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": []
+      }
+    }
+  ]
+}
