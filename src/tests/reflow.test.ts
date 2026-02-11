@@ -199,6 +199,39 @@ const runTests = () => {
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }
+  // --- Test Case 6: Explanation & Change Log (Audit Test) ---
+  try {
+    const { orders, centers } = loadScenario('scenario-robustness-test.json');
+    const reflowed = ReflowService.reflow(orders, centers);
+
+    console.log('\n--- Reflow Audit Log ---');
+    reflowed.explanation.forEach((reason, i) => {
+      console.log(`🔹 ${reflowed.changes[i]} | Reason: ${reason}`);
+    });
+
+    // 1. Assert we have changes
+    assert.ok(reflowed.changes.length > 0, 'Should have logged changes');
+    assert.ok(
+      reflowed.explanation.length === reflowed.changes.length,
+      'Changes and explanations must match 1:1',
+    );
+
+    // 2. Target specific logic checks
+    const hasSandwichFix = reflowed.explanation.some((e) =>
+      e.includes('Original violation: MAINTENANCE_COLLISION'),
+    );
+    const hasCascadeFix = reflowed.explanation.some((e) => e.includes('Cascading shift changes'));
+    const hasConvergenceFix = reflowed.explanation.some((e) =>
+      e.includes('Collision with previous order'),
+    );
+
+    assert.ok(hasSandwichFix, 'Should explain a fix for Maintenance Sandwich');
+    assert.ok(hasCascadeFix, 'Should explain a cascading shift');
+
+    console.log('✅ Test Passed: Change logs and explanations are accurate.');
+  } catch (err) {
+    console.error('❌ Test Failed (Audit Logic):', err instanceof Error ? err.message : err);
+  }
 
   // --- Test Case 4: Perfect Schedule (Stability Test) ---
   try {
