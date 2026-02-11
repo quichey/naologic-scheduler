@@ -96,7 +96,9 @@ export class ReflowService {
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
-            changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+            changes.push(
+              `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+            );
 
             const reason = `Original violation: ${origViolation.type}`;
             explanation.push(reason);
@@ -108,7 +110,9 @@ export class ReflowService {
           // Overlap detected due to a previous move
           const newStart = this.findNextAvailableStart(prevOrderEndDate!, center, allOrders);
           this.applyShift(currOrder, newStart, center, allOrders);
-          changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+          changes.push(
+            `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+          );
           explanation.push(`Cascading shift changes due to earlier violations`);
         }
       } else {
@@ -117,7 +121,9 @@ export class ReflowService {
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
-            changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+            changes.push(
+              `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+            );
 
             const reason = `Original violation: ${origViolation.type}`;
             explanation.push(reason);
@@ -135,7 +141,9 @@ export class ReflowService {
             ? `Original violation: ${origViolation.type}`
             : `Collision with previous order ${prevOrder?.data.workOrderNumber}`;
 
-          changes.push(`Order ${currOrder.docId} moved to ${currOrder.data.startDate}`);
+          changes.push(
+            `Order ${currOrder.data.workOrderNumber} moved to ${currOrder.data.startDate}`,
+          );
           explanation.push(reason);
           hasCascade = true;
         }
