@@ -14,6 +14,60 @@ export class DataGenerator {
   }
 
   /**
+   * Scenario: Parallel chains across multiple centers.
+   * - WC-1: A 3-order chain with a 08:00 AM collision.
+   * - WC-2: A 2-order chain starting inside a maintenance window.
+   * - WC-3: A single maintenance order (fixed) and a child WO that overlaps it.
+   */
+  public static createMultiCenterDependencyScenario(): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(3);
+    const mos = this.generateMOs(3);
+    const orders: WorkOrder[] = [];
+
+    // --- Center 1: The "Standard" Chain ---
+    const wc1 = centers[0].docId;
+    const c1_a = this.createBaseOrder(uuidv4(), wc1);
+    c1_a.data.workOrderNumber = 'C1-A';
+    // Child B depends on A
+    const c1_b = this.createBaseOrder(uuidv4(), wc1, [c1_a.docId]);
+    c1_b.data.workOrderNumber = 'C1-B';
+    // All start at 8am (Violation: Overlap)
+    orders.push(c1_a, c1_b);
+
+    // --- Center 2: The "Maintenance Jump" Chain ---
+    const wc2 = centers[1].docId;
+    centers[1].data.maintenanceWindows = [
+      {
+        startDate: '2026-02-09T08:00:00Z',
+        endDate: '2026-02-09T10:00:00Z',
+        reason: 'Morning Calibration',
+      },
+    ];
+    const c2_a = this.createBaseOrder(uuidv4(), wc2);
+    c2_a.data.workOrderNumber = 'C2-A';
+    c2_a.data.startDate = '2026-02-09T08:00:00Z'; // Violation: Maintenance Collision
+    const c2_b = this.createBaseOrder(uuidv4(), wc2, [c2_a.docId]);
+    c2_b.data.workOrderNumber = 'C2-B';
+    orders.push(c2_a, c2_b);
+
+    // --- Center 3: The "Fixed Maintenance" Constraint ---
+    const wc3 = centers[2].docId;
+    const c3_maint = this.createBaseOrder(uuidv4(), wc3);
+    c3_maint.data.workOrderNumber = 'C3-FIXED';
+    c3_maint.data.isMaintenance = true; // CANNOT BE MOVED
+
+    const c3_child = this.createBaseOrder(uuidv4(), wc3, [c3_maint.docId]);
+    c3_child.data.workOrderNumber = 'C3-CHILD';
+    c3_child.data.startDate = '2026-02-09T08:00:00Z'; // Violation: Overlap with fixed order
+    orders.push(c3_maint, c3_child);
+
+    return { orders, centers };
+  }
+
+  /**
    * Scenario: Multi-parent dependency (Convergence).
    * WO-C depends on BOTH WO-A and WO-B.
    * Tests if the reflow engine waits for the LATEST parent to finish.
@@ -361,6 +415,10 @@ const run = () => {
     result = DataGenerator.createMultiParentScenario();
     filename = 'scenario-multi-parent.json';
     console.log('🧬 Generating Multi-Parent Convergence Scenario...');
+  } else if (scenarioArg === 'multi-center') {
+    result = DataGenerator.createMultiCenterDependencyScenario();
+    filename = 'scenario-multi-center.json';
+    console.log('🏢 Generating Multi-Center Parallel Chains Scenario...');
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');
