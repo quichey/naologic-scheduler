@@ -137,3 +137,9 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Ignore all debug files
+src/tests/debug/*
+
+# Exception so the folder is tracked
+!src/tests/debug/.gitkeep

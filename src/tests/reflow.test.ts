@@ -19,7 +19,7 @@ const debugHelper = (
   if (violationsAfter.length > 0) {
     const debugPath = debug_file
       ? debug_file
-      : path.join(process.cwd(), 'debug-reflow-results.json');
+      : path.join(process.cwd(), 'src', 'tests', 'debug', 'debug-reflow-results.json');
     fs.writeFileSync(
       debugPath,
       JSON.stringify(
