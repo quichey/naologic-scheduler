@@ -233,6 +233,40 @@ const runTests = () => {
     console.error('❌ Test Failed (Audit Logic):', err instanceof Error ? err.message : err);
   }
 
+  try {
+    const { orders, centers } = loadScenario('stress-10000o-50c.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Stress test scenario should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Stress Testing dataset should have ZERO violations after reflow',
+    );
+    console.log('✅ Test Passed: Stress test scenario successfully reflowed.');
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+
+  try {
+    const { orders, centers } = loadScenario('stress-1000o-50c.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Stress test 1000 scenario should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Stress Testing 1000 dataset should have ZERO violations after reflow',
+    );
+    console.log('✅ Test Passed: Stress test 1000 scenario successfully reflowed.');
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+
   // --- Test Case 4: Perfect Schedule (Stability Test) ---
   try {
     const { orders, centers } = loadScenario('scenario-perfect.json');

@@ -324,6 +324,56 @@ export class DataGenerator {
     };
   }
   /**
+   * Scenario: Dynamic Stress Test
+   * Distributes a target number of orders across centers with randomized
+   * chain lengths and maintenance blocks.
+   */
+  public static createDynamicStress(
+    centerCount: number,
+    orderCount: number,
+  ): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(centerCount);
+    const orders: WorkOrder[] = [];
+
+    // 1. Assign a random "weight" to each center to distribute orders unevenly
+    const weights = centers.map(() => Math.random());
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+    centers.forEach((center, i) => {
+      const wcId = center.docId;
+      // Calculate how many orders go to this specific machine
+      const ordersForThisCenter = Math.floor((weights[i] / totalWeight) * orderCount);
+
+      // Add a maintenance block to every center to ensure complexity
+      center.data.maintenanceWindows = [
+        {
+          startDate: '2026-02-09T08:00:00Z',
+          endDate: '2026-02-09T08:30:00Z',
+          reason: 'Maintenance',
+        },
+      ];
+
+      let previousId: string | null = null;
+      for (let j = 0; j < ordersForThisCenter; j++) {
+        // Randomly decide to break the chain and start a new one (30% chance)
+        if (Math.random() < 0.3) previousId = null;
+
+        const order = this.createBaseOrder(uuidv4(), wcId, previousId ? [previousId] : []);
+        order.data.workOrderNumber = `WC${i}-ORD${j}`;
+        // Start everyone at 08:00 AM to force the engine to resolve overlaps
+        order.data.startDate = '2026-02-09T08:00:00Z';
+        order.data.durationMinutes = 20 + Math.floor(Math.random() * 40);
+        orders.push(order);
+        previousId = order.docId;
+      }
+    });
+
+    return { orders, centers };
+  }
+  /**
    * Scenario: A perfectly sequenced schedule.
    * 3 Orders: A -> B -> C, all on the same Work Center, no overlaps.
    */
@@ -533,6 +583,16 @@ const run = () => {
     filename = 'scenario-robustness-test.json';
     console.log('🧪 Generating Complex Robustness Scenario...');
     console.log('   - Testing: Sandwich, Shift Boundaries, Convergence, and Center Isolation.');
+  } else if (scenarioArg === 'stress') {
+    const wcCount = parseInt(args.find((a) => a.startsWith('--centers='))?.split('=')[1] || '10');
+    const orderCount = parseInt(
+      args.find((a) => a.startsWith('--orders='))?.split('=')[1] || '100',
+    );
+
+    result = DataGenerator.createDynamicStress(wcCount, orderCount);
+    filename = `stress-${orderCount}o-${wcCount}c.json`;
+
+    console.log(`🚀 Stress Test: ${orderCount} orders across ${wcCount} centers.`);
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');
