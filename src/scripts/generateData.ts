@@ -525,7 +525,7 @@ const run = () => {
   const args = process.argv.slice(2);
   const scenarioArg = args.find((a) => a.startsWith('--scenario='))?.split('=')[1];
 
-  const outputDir = path.join(process.cwd(), 'src', 'data');
+  let outputDir = path.join(process.cwd(), 'src', 'data');
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   let result: any;
@@ -591,6 +591,7 @@ const run = () => {
 
     result = DataGenerator.createDynamicStress(wcCount, orderCount);
     filename = `stress-${orderCount}o-${wcCount}c.json`;
+    outputDir = path.join(outputDir, 'large');
 
     console.log(`🚀 Stress Test: ${orderCount} orders across ${wcCount} centers.`);
   } else {
@@ -604,7 +605,7 @@ const run = () => {
   }
 
   fs.writeFileSync(path.join(outputDir, filename), JSON.stringify(result, null, 2));
-  console.log(`💾 Saved to src/data/${filename}`);
+  console.log(`💾 Saved to ${outputDir}/${filename}`);
 };
 
 run();
