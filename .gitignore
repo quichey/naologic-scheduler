@@ -140,6 +140,10 @@ vite.config.ts.timestamp-*
 
 # Ignore all debug files
 src/tests/debug/*
-
 # Exception so the folder is tracked
 !src/tests/debug/.gitkeep
+
+# Ignore all debug files
+src/data/large/*.json
+# Exception so the folder is tracked
+!src/data/large/.gitkeep

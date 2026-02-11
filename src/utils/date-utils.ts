@@ -3,6 +3,36 @@ import type { WorkCenter } from '../reflow/types.js';
 
 export class DateUtils {
   /**
+   * Validates if a specific time falls within any of the provided shifts for a work center.
+   * @param time The DateTime to check
+   * @param shifts Array of shift definitions (dayOfWeek 0-6, startHour, endHour)
+   * @param options.isEnd Whether this is an end-time check (allows exact match on shift end,
+   * disallows exact match on shift start)
+   */
+  public static isTimeInShift(
+    time: DateTime,
+    shifts: { dayOfWeek: number; startHour: number; endHour: number }[],
+    options: { isEnd?: boolean } = {},
+  ): boolean {
+    const { isEnd = false } = options;
+    const dayOfWeek = time.weekday % 7;
+
+    return shifts.some((s) => {
+      if (s.dayOfWeek !== dayOfWeek) return false;
+
+      const shiftStart = time.set({ hour: s.startHour, minute: 0, second: 0, millisecond: 0 });
+      const shiftEnd = time.set({ hour: s.endHour, minute: 0, second: 0, millisecond: 0 });
+
+      if (isEnd) {
+        // End times: Must be after the shift starts and can be exactly at the shift end
+        return time > shiftStart && time <= shiftEnd;
+      } else {
+        // Start times: Can be exactly at the shift start and must be before the shift ends
+        return time >= shiftStart && time < shiftEnd;
+      }
+    });
+  }
+  /**
    * Calculates the total "on-the-clock" minutes between two dates,
    * considering work center shifts and excluding maintenance windows.
    */

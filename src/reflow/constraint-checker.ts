@@ -182,7 +182,6 @@ export class ConstraintChecker {
     }
     return violations;
   }
-
   private static checkShifts(orders: WorkOrder[], centers: WorkCenter[]): Violation[] {
     const violations: Violation[] = [];
 
@@ -212,12 +211,7 @@ export class ConstraintChecker {
       }
 
       // 2. NEW check: Is the startDate actually inside a shift?
-      const isStartInShift = center.data.shifts.some(
-        (s) =>
-          s.dayOfWeek === start.weekday % 7 && start.hour >= s.startHour && start.hour < s.endHour,
-      );
-
-      if (!isStartInShift) {
+      if (!DateUtils.isTimeInShift(start, center.data.shifts, { isEnd: false })) {
         violations.push({
           orderId: order.docId,
           type: 'OUTSIDE_SHIFT',
@@ -227,11 +221,7 @@ export class ConstraintChecker {
       }
 
       // 3. NEW check: Is the endDate actually inside a shift?
-      const isEndInShift = center.data.shifts.some(
-        (s) => s.dayOfWeek === end.weekday % 7 && end.hour > s.startHour && end.hour <= s.endHour,
-      );
-
-      if (!isEndInShift) {
+      if (!DateUtils.isTimeInShift(end, center.data.shifts, { isEnd: true })) {
         violations.push({
           orderId: order.docId,
           type: 'OUTSIDE_SHIFT',
