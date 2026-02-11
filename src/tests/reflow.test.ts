@@ -39,15 +39,80 @@ const runTests = () => {
   // --- Test Case 3: Valid Dataset (Stress Test) ---
   try {
     const { orders, centers } = loadScenario('500-orders-10-centers.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
     const reflowed = ReflowService.reflow(orders, centers);
     const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
 
+    console.log(`violations before: ${violationsBefore.length}`);
     assert.strictEqual(
       violations.length,
       0,
       'Standard dataset should have ZERO violations after reflow',
     );
     console.log('✅ Test Passed: 500-order dataset successfully reflowed.');
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('100-orders-3-centers.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    console.log(`violations before: ${violationsBefore.length}`);
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log('✅ Test Passed: 100-order dataset successfully reflowed.');
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('10-orders-2-centers.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violationsAfter = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    console.log(`[10 Orders] Violations Before: ${violationsBefore.length}`);
+    console.log(`[10 Orders] Violations After: ${violationsAfter.length}`);
+
+    if (violationsAfter.length > 0) {
+      const debugPath = path.join(process.cwd(), 'debug-reflow-results.json');
+      fs.writeFileSync(
+        debugPath,
+        JSON.stringify(
+          {
+            violations: violationsAfter,
+            updatedOrders: reflowed.updatedWorkOrders,
+          },
+          null,
+          2,
+        ),
+      );
+
+      console.log(`⚠️ Violations remained. Debug file saved to: ${debugPath}`);
+      console.log('Top Violation Types:', [...new Set(violationsAfter.map((v) => v.type))]);
+    }
+
+    assert.strictEqual(violationsAfter.length, 0, 'Should have zero violations');
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
+  try {
+    const { orders, centers } = loadScenario('10-order-single-center.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    console.log(`violations before: ${violationsBefore.length}`);
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log('✅ Test Passed: 100-order dataset successfully reflowed.');
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }

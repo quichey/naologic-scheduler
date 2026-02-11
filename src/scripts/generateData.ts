@@ -14,6 +14,43 @@ export class DataGenerator {
   }
 
   /**
+   * Scenario: High-density dependency chains on a single center.
+   * Useful for testing "Time Walking" and "Maintenance Jumping" logic
+   * without cross-center complexity.
+   */
+  public static createSingleCenterDependencyScenario(orderCount: number): {
+    orders: WorkOrder[];
+    centers: WorkCenter[];
+  } {
+    const centers = this.generateWorkCenters(1); // Force only 1 center
+    const mos = this.generateMOs(1);
+    const wcId = centers[0].docId;
+    const orders: WorkOrder[] = [];
+
+    for (let i = 0; i < orderCount; i++) {
+      const parent = i > 0 ? orders[i - 1] : null;
+
+      orders.push({
+        docId: uuidv4(),
+        docType: 'workOrder',
+        data: {
+          workOrderNumber: `WO-CHAIN-${i}`,
+          manufacturingOrderId: mos[0].docId,
+          workCenterId: wcId,
+          // Start everyone at the exact same second to force reflow to sort them
+          startDate: '2026-02-09T08:00:00Z',
+          endDate: '2026-02-09T09:00:00Z',
+          durationMinutes: 60,
+          isMaintenance: false,
+          dependsOnWorkOrderIds: parent ? [parent.docId] : [],
+        },
+      });
+    }
+
+    return { orders, centers };
+  }
+
+  /**
    * Scenario: An order collides with a Maintenance window.
    */
   public static createOrderCollidesWithMaintenance(): {
@@ -282,6 +319,11 @@ const run = () => {
     result = DataGenerator.createInsufficientMinutesScenario();
     filename = 'scenario-insufficient-time.json';
     console.log('⏳ Generating Insufficient Minutes Scenario...');
+  } else if (scenarioArg === 'single-chain') {
+    const orderCount = parseInt(args.find((a) => a.startsWith('--orders='))?.split('=')[1] || '10');
+    result = DataGenerator.createSingleCenterDependencyScenario(orderCount);
+    filename = `${orderCount}-order-single-center.json`;
+    console.log(`⛓️ Generating Single Center Chain: ${orderCount} orders on 1 center...`);
   } else {
     // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');
