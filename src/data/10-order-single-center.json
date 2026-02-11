@@ -1,0 +1,184 @@
+{
+  "orders": [
+    {
+      "docId": "94434032-1c3a-4952-b894-55da01b1b062",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-0",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": []
+      }
+    },
+    {
+      "docId": "19721eeb-3d91-46d0-848c-51ca29c3412b",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-1",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "94434032-1c3a-4952-b894-55da01b1b062"
+        ]
+      }
+    },
+    {
+      "docId": "31ab1565-06fc-48d1-be0b-c67718816553",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-2",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "19721eeb-3d91-46d0-848c-51ca29c3412b"
+        ]
+      }
+    },
+    {
+      "docId": "71724778-3230-47f1-8788-8072e17dc66e",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-3",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "31ab1565-06fc-48d1-be0b-c67718816553"
+        ]
+      }
+    },
+    {
+      "docId": "fc2cf57d-d6fe-4ceb-8ee9-b10378fa5f37",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-4",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "71724778-3230-47f1-8788-8072e17dc66e"
+        ]
+      }
+    },
+    {
+      "docId": "40ecc588-5531-4947-b321-5b511e78ee3c",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-5",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "fc2cf57d-d6fe-4ceb-8ee9-b10378fa5f37"
+        ]
+      }
+    },
+    {
+      "docId": "6f44ad1b-35e1-46c6-abca-3cadad1f9a26",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-6",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "40ecc588-5531-4947-b321-5b511e78ee3c"
+        ]
+      }
+    },
+    {
+      "docId": "e55342fa-599a-496e-ae38-9d932de5a39b",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-7",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "6f44ad1b-35e1-46c6-abca-3cadad1f9a26"
+        ]
+      }
+    },
+    {
+      "docId": "84191e19-1332-48ea-ac38-98eca9874a5b",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-8",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "e55342fa-599a-496e-ae38-9d932de5a39b"
+        ]
+      }
+    },
+    {
+      "docId": "6df51d9f-18f5-4576-a9bd-1dec60ce3d04",
+      "docType": "workOrder",
+      "data": {
+        "workOrderNumber": "WO-CHAIN-9",
+        "manufacturingOrderId": "378bf26c-c4ef-42e1-bf5b-8f746f490011",
+        "workCenterId": "wc-1",
+        "startDate": "2026-02-09T08:00:00Z",
+        "endDate": "2026-02-09T09:00:00Z",
+        "durationMinutes": 60,
+        "isMaintenance": false,
+        "dependsOnWorkOrderIds": [
+          "84191e19-1332-48ea-ac38-98eca9874a5b"
+        ]
+      }
+    }
+  ],
+  "centers": [
+    {
+      "docId": "wc-1",
+      "docType": "workCenter",
+      "data": {
+        "name": "Machine A",
+        "shifts": [
+          {
+            "dayOfWeek": 1,
+            "startHour": 8,
+            "endHour": 17
+          },
+          {
+            "dayOfWeek": 2,
+            "startHour": 8,
+            "endHour": 17
+          }
+        ],
+        "maintenanceWindows": []
+      }
+    }
+  ]
+}
