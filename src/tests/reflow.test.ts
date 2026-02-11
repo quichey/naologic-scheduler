@@ -145,6 +145,24 @@ const runTests = () => {
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }
+  try {
+    const { orders, centers } = loadScenario('scenario-multi-center.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Scenario multi-center should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log(
+      '✅ Test Passed: Multi-center with dependency violations dataset successfully reflowed.',
+    );
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
 
   // --- Test Case 4: Perfect Schedule (Stability Test) ---
   try {
