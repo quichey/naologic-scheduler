@@ -181,6 +181,24 @@ const runTests = () => {
   } catch (err) {
     console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
   }
+  try {
+    const { orders, centers } = loadScenario('scenario-robustness-test.json');
+    const violationsBefore = ConstraintChecker.verify(orders, centers);
+    const reflowed = ReflowService.reflow(orders, centers);
+    const violations = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
+
+    assert.ok(violationsBefore.length > 0, 'Scenario robustness should have a violation');
+    assert.strictEqual(
+      violations.length,
+      0,
+      'Standard dataset should have ZERO violations after reflow',
+    );
+    console.log(
+      '✅ Test Passed: Scenario with combination of smaller scenarios successfully reflowed.',
+    );
+  } catch (err) {
+    console.error('❌ Test Failed (Valid Data):', err instanceof Error ? err.message : err);
+  }
 
   // --- Test Case 4: Perfect Schedule (Stability Test) ---
   try {
