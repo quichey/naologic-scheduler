@@ -1,31 +1,57 @@
-import type { WorkOrder, WorkCenter, ManufacturingOrder } from './types.js';
+import type { WorkOrder, WorkCenter } from './types.js';
 import type { Violation } from './constraint-checker.js';
 import { ConstraintChecker } from './constraint-checker.js';
 import { SequencePreserver } from './sequence-preserver.js';
-
 import { DateTime } from 'luxon';
-import { DateUtils } from '../utils/date-utils.js';
 
+/**
+ * Represents the results of a schedule reflow operation.
+ */
 export interface ReflowedSchedule {
+  /** The full list of work orders with updated temporal data. */
   updatedWorkOrders: WorkOrder[];
+  /** A log of specific movements (e.g., "Order X moved to Y"). */
   changes: string[];
+  /** A natural language explanation of the logic applied (e.g., "Cascading shift"). */
   explanation: string[];
 }
 
+/**
+ * ReflowService provides the core scheduling logic to resolve constraint violations.
+ * It utilizes a "Detect and Repair" strategy, grouping orders by work center and
+ * resolving overlaps while preserving original intent and dependencies.
+ */
 export class ReflowService {
+  /**
+   * Entry point for the reflow operation. Performs a pre-validation check
+   * to ensure the dataset is fixable before attempting to reschedule.
+   * * @param orders - The current list of work orders.
+   * @param centers - The available work centers and their constraints.
+   * @returns A new schedule or throws if fatal violations (like circular deps) exist.
+   * @throws Error "NOT FIXABLE" if a fatal violation is detected.
+   */
   public static reflow(orders: WorkOrder[], centers: WorkCenter[]): ReflowedSchedule {
     let violations = ConstraintChecker.verify(orders, centers);
+
     // If there are no violations, just return orders
-    if (violations.length == 0) {
+    if (violations.length === 0) {
       return { updatedWorkOrders: orders, changes: [], explanation: [] };
     }
-    // If there are any fatal violations, error out
+
+    // If there are any fatal violations, error out instead of running an infinite loop
     if (violations.find((v) => v.isFatal)) {
       throw Error('NOT FIXABLE');
     }
-    // Do schedule changes
+
+    // Begin the automated repair process
     return this.reschedule(orders, centers, violations);
   }
+
+  /**
+   * Internal orchestrator that iterates through each work center to resolve local conflicts.
+   * It performs a deep clone of orders to ensure data immutability during the calculation phase.
+   * * @private
+   */
   private static reschedule(
     orders: WorkOrder[],
     centers: WorkCenter[],
@@ -35,7 +61,7 @@ export class ReflowService {
     let changes: string[] = [];
     let explanation: string[] = [];
 
-    // We process center by center
+    // Process scheduling constraints center-by-center
     for (const center of centers) {
       const centerOrders = currentOrders.filter(
         (o: WorkOrder) => o.data.workCenterId === center.docId,
@@ -59,9 +85,14 @@ export class ReflowService {
 
     return { updatedWorkOrders: currentOrders, changes, explanation };
   }
-  /*
-  Assume orders all have the same work center
-  */
+
+  /**
+   * Manages scheduling for a specific Work Center.
+   * It respects the topological sequence provided by the SequencePreserver and
+   * manages the "Cascade" state to track if movements are caused by original
+   * violations or downstream effects.
+   * * @private
+   */
   private static rescheduleByCenter(
     orders: WorkOrder[],
     center: WorkCenter,
@@ -70,13 +101,14 @@ export class ReflowService {
     changes: string[],
     explanation: string[],
   ): WorkOrder[] {
+    // 1. Get the optimized sequence (dependencies + original order)
     const processingOrder = SequencePreserver.prepare(orders).get(center.docId) || [];
     const correctlyScheduledOrders: WorkOrder[] = [];
 
     let hasCascade = false;
 
     for (let i = 0; i < processingOrder.length; i++) {
-      // 1. Setup current and previous context
+      // 2. Setup current and previous context for overlap checking
       const currOrder = processingOrder[i].order;
       const prevOrder = i > 0 ? correctlyScheduledOrders[i - 1] : null;
 
@@ -85,14 +117,18 @@ export class ReflowService {
         ? DateTime.fromISO(prevOrder.data.endDate, { zone: 'utc' })
         : null;
 
-      // Find the specific original cause for the logs
+      // Determine if this order is currently scheduled correctly relative to its predecessor
       const checkForOriginalViolations =
         (prevOrderEndDate && currOrderStartDate >= prevOrderEndDate) || prevOrderEndDate == null;
+
+      // Look up if this order had a pre-existing violation (Shift/Maintenance/Dependency)
       const origViolation = originalViolations.find((v) => v.orderId === currOrder.docId);
-      // 2. Logic Branching based on Cascade state
+
+      // 3. Logic Branching based on Cascade state
+      // A cascade means a previous order in this sequence was moved, likely pushing this one out.
       if (hasCascade) {
         if (checkForOriginalViolations) {
-          // We aren't overlapping the previous order, but we might still hit maintenance
+          // We aren't overlapping the previous order, but we might still hit maintenance/shifts
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
             this.applyShift(currOrder, newStart, center, allOrders);
@@ -102,12 +138,13 @@ export class ReflowService {
 
             const reason = `Original violation: ${origViolation.type}`;
             explanation.push(reason);
-            // Cascade continues because we moved
+            // Cascade continues because we had to move this order
           } else {
+            // The cascade ends here as this order fits in its original slot
             hasCascade = false;
           }
         } else {
-          // Overlap detected due to a previous move
+          // Overlap detected due to a previous move (The "Cascade" effect)
           const newStart = this.findNextAvailableStart(prevOrderEndDate!, center, allOrders);
           this.applyShift(currOrder, newStart, center, allOrders);
           changes.push(
@@ -116,7 +153,7 @@ export class ReflowService {
           explanation.push(`Cascading shift changes due to earlier violations`);
         }
       } else {
-        // No active cascade, checking for original sins
+        // No active cascade, checking for "Original Sins"
         if (checkForOriginalViolations) {
           if (origViolation) {
             const newStart = this.findNextAvailableStart(currOrderStartDate, center, allOrders);
@@ -130,7 +167,7 @@ export class ReflowService {
             hasCascade = true;
           }
         } else {
-          // Either overlap with previous OR an original violation (Shift/Dependency)
+          // Collision with the previous order OR an original violation
           const nextStart = prevOrderEndDate
             ? this.findNextAvailableStart(prevOrderEndDate, center, allOrders)
             : this.findNextAvailableStart(currOrderStartDate, center, allOrders);
@@ -156,7 +193,8 @@ export class ReflowService {
   }
 
   /**
-   * Small helper to apply time changes and re-calculate end date
+   * Helper to update an order's start date and re-calculate the end date.
+   * * @private
    */
   private static applyShift(
     order: WorkOrder,
@@ -174,8 +212,8 @@ export class ReflowService {
   }
 
   /**
-   * Checks if the current order's window overlaps with either maintenance orders
-   * or the work center's static maintenance windows.
+   * Checks if the order's window overlaps with maintenance orders or static windows.
+   * * @private
    */
   private static conflictsWithMaintenance(
     order: WorkOrder,
@@ -188,11 +226,8 @@ export class ReflowService {
     // 1. Check against Maintenance Work Orders
     const hasOrderConflict = allOrders.some((o) => {
       if (!o.data.isMaintenance || o.data.workCenterId !== center.docId) return false;
-
       const mStart = DateTime.fromISO(o.data.startDate, { zone: 'utc' });
       const mEnd = DateTime.fromISO(o.data.endDate, { zone: 'utc' });
-
-      // Overlap logic: if the order
       return (start < mEnd && start >= mStart) || (end <= mEnd && end > mStart);
     });
 
@@ -202,16 +237,17 @@ export class ReflowService {
     const hasWindowConflict = center.data.maintenanceWindows.some((window) => {
       const wStart = DateTime.fromISO(window.startDate, { zone: 'utc' });
       const wEnd = DateTime.fromISO(window.endDate, { zone: 'utc' });
-
       return (start < wEnd && start >= wStart) || (end <= wEnd && end > wStart);
     });
 
     return hasWindowConflict;
   }
+
   /**
    * Finds the first valid minute for an order to start.
    * It must be within a WorkCenter shift AND not overlapping
-   * a Maintenance Work Order OR a static Maintenance Window.
+   * maintenance (orders or windows).
+   * * @private
    */
   private static findNextAvailableStart(
     proposedStart: DateTime,
@@ -221,7 +257,6 @@ export class ReflowService {
     let current = proposedStart;
     let foundValidStart = false;
 
-    // Filter maintenance orders once
     const maintenanceOrders = allOrders.filter(
       (o) => o.data.isMaintenance && o.data.workCenterId === center.docId,
     );
@@ -252,15 +287,12 @@ export class ReflowService {
       }
 
       // --- 2. Combined Maintenance Check (Orders + Windows) ---
-
-      // Check for Maintenance Work Orders
       const orderBlocker = maintenanceOrders.find((m) => {
         const mStart = DateTime.fromISO(m.data.startDate, { zone: 'utc' });
         const mEnd = DateTime.fromISO(m.data.endDate, { zone: 'utc' });
         return current >= mStart && current < mEnd;
       });
 
-      // Check for Static Maintenance Windows
       const windowBlocker = center.data.maintenanceWindows.find((w) => {
         const wStart = DateTime.fromISO(w.startDate, { zone: 'utc' });
         const wEnd = DateTime.fromISO(w.endDate, { zone: 'utc' });
@@ -282,9 +314,11 @@ export class ReflowService {
 
     return current;
   }
+
   /**
    * Calculates the end date by "walking" through available shift minutes,
    * skipping over Maintenance Orders and Maintenance Windows.
+   * * @private
    */
   private static findEndDate(
     start: DateTime,
@@ -321,7 +355,7 @@ export class ReflowService {
           .filter((obs) => obs.start >= current && obs.start < shiftEnd)
           .sort((a, b) => a.start.toMillis() - b.start.toMillis())[0];
 
-        // The next point where work MUST stop
+        // The next point where work MUST stop (either shift end or an obstacle start)
         const nextDeadline = nextObstacle ? nextObstacle.start : shiftEnd;
         const minutesAvailable = nextDeadline.diff(current, 'minutes').minutes;
 
