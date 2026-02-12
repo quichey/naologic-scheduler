@@ -1,65 +1,85 @@
-# 🚀 Naologic Scheduler
+# 🚀 naologic-scheduler
 
-A high-performance manufacturing scheduling engine designed to reflow work orders across multiple work centers while adhering to complex temporal, resource, and maintenance constraints.
+Take Home Assessment for Naologic. A high-performance manufacturing scheduling engine designed to reflow work orders while adhering to complex temporal, resource, and maintenance constraints.
 
 ## 🏗️ Architecture
 
-The system is built with a modular approach to ensure that constraints can be validated both during the reflow process and as a standalone audit for large datasets.
+The system is built with a modular approach to ensure that constraints can be validated both during the reflow process and as a standalone audit for automated testing.
 
-- **Core Algorithm (`reflow.service.ts`):** Orchestrates the rescheduling of work orders. It utilizes a "Detect and Repair" loop, failing early if fatal violations are discovered.
-- **Constraint Checker (`constraint-checker.ts`):** The source of truth for schedule integrity. It serves as both a sub-module of the reflow engine and a standalone validator for automated testing.
-- **Sequence Preserver (`sequence-preserver.ts`):** Implements topological sorting to ensure that dependency chains are respected while maintaining the relative original order of independent tasks.
-- **Data Utility Hub (`utils/`):** Contains `DateUtils` leveraging `Luxon` for UTC-safe interval math and shift boundary validation.
+- **Data Generator:** Scripts to create various manufacturing scenarios and stress-test datasets.
+- **Core Algorithm:**
+  - `reflow.service.ts`: Orchestrates the rescheduling of work orders. It utilizes a "Detect and Repair" loop.
+  - `constraint-checker.ts`: The source of truth for schedule integrity; serves as both a sub-module of reflow and a standalone validator.
+  - `sequence-preserver.ts`: Implements topological sorting to ensure dependency chains are respected while maintaining original order sequences.
+  - `types.ts`: Centralized TypeScript interfaces for Work Orders, Centers, and Violations.
+  - `utils/`: Includes `date-utils.ts` for UTC-safe interval math and shift boundary validation.
+- **Automated Testing:** Located in `src/tests/`, covering both individual constraints and full reflow integration.
 
 ---
 
 ## ⚙️ Reflow Logic & "Cascading" Shifts
 
-To handle complex manufacturing environments, the algorithm groups orders by **Work Center**.
+To handle the complexity of manufacturing, the algorithm groups orders by **Work Center**.
 
-1. **Topological Sequencing:** For each center, dependency groups are sorted. Independent orders maintain their original relative sequence to minimize unnecessary schedule churn.
-2. **The "Cascade" Effect:** When an early order is moved (due to a maintenance window or shift change), all subsequent orders in that center’s sequence are evaluated. If an order is shifted solely because its predecessor finished later, the system flags the reason as **"Cascading"**, providing clear traceability for schedule changes.
-3. **Safety Rails:** If the engine detects a scenario that is mathematically impossible to resolve (e.g., circular dependencies), it exits with a fatal error to allow for manual intervention rather than entering an infinite loop.
+### Sequence Preservation
+
+For each center, `sequence-preserver.ts` is used to:
+
+1. **Topological Sort:** Analyze dependency groups to ensure parent tasks always precede children.
+2. **Relative Sequencing:** Maintain the original relative sequence of independent orders to minimize schedule churn.
+3. **The "Cascade" Effect:** The algorithm iterates through the new sequence, ensuring each order starts after its predecessor. If an order is shifted solely because its predecessor moved, the system flags the reason as **"Cascading"**, providing clear traceability.
+
+### Maintenance & Fixed Orders
+
+**Constraint Question:** _If a maintenance work order cannot be moved, what if its duration is longer than a shift?_
+**Decision:** Maintenance Work Orders are treated as critical events that proceed even outside of regular Work Center shifts. They are "fixed" in time and the algorithm will move regular production orders around them.
+
+### Safety Rails
+
+If the engine detects a scenario that is mathematically impossible to resolve (e.g., circular dependencies or overlapping fixed maintenance), it exits with a **Fatal Error** to allow for manual intervention.
 
 ---
 
 ## 🛡️ Constraint Checker Engine
 
-The `ConstraintChecker` is the high-integrity validation core of the scheduling system. It performs a multi-pass audit on reflowed datasets to ensure every Work Order adheres to physical, temporal, and business-logic constraints.
+The `ConstraintChecker` performs a multi-pass audit on reflowed datasets to ensure every Work Order adheres to physical and business-logic constraints.
 
 ### 🔍 Validation Suite
 
-| Constraint Type           | Description                                                                                                         | Severity  |
-| :------------------------ | :------------------------------------------------------------------------------------------------------------------ | :-------- |
-| **OVERLAP**               | Ensures a Work Center only handles one Work Order at a time.                                                        | Warning   |
-| **OUTSIDE_SHIFT**         | Validates that non-maintenance work occurs strictly within active Work Center shifts using UTC-safe boundary logic. | Warning   |
-| **MAINTENANCE_COLLISION** | Detects if a standard Work Order is scheduled during a Work Center’s blackout/maintenance window.                   | Warning   |
-| **DEPENDENCY_ERROR**      | Validates the "Finish-to-Start" relationship; parent orders must complete before child orders begin.                | Warning   |
-| **FIXED_ORDER_MOVED**     | Alerts if a "Fixed" Maintenance Work Order was moved from its original immutable slot.                              | Warning   |
-| **FATAL: CIRCULAR DEP**   | Detects infinite loops in the dependency graph (e.g., A → B → A).                                                   | **Fatal** |
-| **FATAL: MAINT OVERLAP**  | Detects overlapping fixed maintenance windows on the same resource which cannot be resolved by shifting.            | **Fatal** |
+| Constraint Type           | Description                                                                                              | Severity  |
+| :------------------------ | :------------------------------------------------------------------------------------------------------- | :-------- |
+| **OVERLAP**               | Ensures a Work Center only handles one Work Order at a time.                                             | Warning   |
+| **OUTSIDE_SHIFT**         | Validates that work occurs strictly within active Work Center shifts using UTC-safe boundary logic.      | Warning   |
+| **MAINTENANCE_COLLISION** | Detects if a standard Work Order overlaps with a resource blackout/maintenance window.                   | Warning   |
+| **DEPENDENCY_ERROR**      | Validates "Finish-to-Start" logic; child orders cannot start before parents finish.                      | Warning   |
+| **FIXED_ORDER_MOVED**     | Alerts if an immutable "Fixed" Maintenance Order was shifted from its original slot.                     | Warning   |
+| **FATAL: CIRCULAR DEP**   | Detects infinite loops in the dependency graph (e.g., A → B → A).                                        | **Fatal** |
+| **FATAL: MAINT OVERLAP**  | Detects overlapping fixed maintenance windows on the same resource which cannot be resolved by shifting. | **Fatal** |
 
 ### 🛠️ Key Architectural Features
 
-- **Temporal Precision:** Leverages `Luxon` and `Interval` math to prevent timezone "drift" from invalidating shift boundaries across global work centers.
-- **Shift Boundary Handling:** Implements specialized `isTimeInShift` logic to correctly handle "on-the-hour" edge cases (e.g., an order ending exactly at 08:00 when a shift begins).
-- **Graph Analysis:** Utilizes Depth-First Search (DFS) with recursion stack tracking to identify circular dependencies in complex manufacturing orders.
-- **Performance at Scale:** Optimized for large-scale datasets (170k+ records) by utilizing Work Center grouping and O(n log n) sorting strategies before validation.
+- **Temporal Precision:** Leverages `Luxon` and `Interval` math to prevent timezone "drift" across global work centers.
+- **Shift Boundary Handling:** Implements specialized `isTimeInShift` logic to handle "on-the-hour" hand-offs (e.g., an order ending exactly at 08:00 when a shift begins).
+- **Performance at Scale:** Optimized for large-scale datasets (170k+ records) utilizing Work Center grouping and O(n log n) sorting.
 
-### 🚦 Data Structure
+---
 
-The checker returns a standardized array of violations, allowing the UI or the Reflow algorithm to react accordingly:
+## 🧪 Automated Testing & Debugging
 
-```typescript
-export interface Violation {
-  orderId: string;
-  type:
-    | 'OVERLAP'
-    | 'OUTSIDE_SHIFT'
-    | 'MAINTENANCE_COLLISION'
-    | 'DEPENDENCY_ERROR'
-    | 'FIXED_ORDER_MOVED';
-  message: string;
-  isFatal: boolean; // True if the algorithm cannot resolve this automatically
-}
-```
+The project emphasizes a data-driven testing workflow:
+
+1. **Generation:** Create scenarios using `npm run data:gen:<scenario>`.
+2. **Execution:** Run targeted suites via `npm run test:<file>`.
+3. **Debug Helpers:** If a test fails, a local `debugHelper` function generates JSON snapshots of the violations and the reflowed schedule. These are ignored via `.gitignore`.
+
+### Package Utility Scripts
+
+- `data:gen:<scenario>`: Generate specific datasets.
+- `test:<module/file>`: Run specific test suites (e.g., `npm run test:reflow`).
+
+---
+
+## 📈 Roadmap & Upgrades
+
+- [ ] **Cross-Center Dependencies:** Support for dependency chains that span multiple work centers.
+- [ ] **Multi-Resource Work Orders:** Logic for tasks requiring multiple work centers simultaneously.
