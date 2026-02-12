@@ -1,48 +1,33 @@
-# naologic-scheduler
+# 🚀 Naologic Scheduler
 
-Take Home Assessment for Naologic
+A high-performance manufacturing scheduling engine designed to reflow work orders across multiple work centers while adhering to complex temporal, resource, and maintenance constraints.
 
-# Architecture
+## 🏗️ Architecture
 
-- Data generator
-- Core Algorithm
-  -- reflow.service.ts
-  -- constraint-checker.ts
-  -- types.ts
-  -- sequence-preserver.ts
-  -- utils/
-- Automated Testing
-  -- src/tests
-  --- src/tests/constraint-checker.test.ts
-  --- src/tests/reflow.test.ts
+The system is built with a modular approach to ensure that constraints can be validated both during the reflow process and as a standalone audit for large datasets.
 
-Constraint Checker servers multiple functions. It serves as both a part of the reflow algorithm as well as a verifier in automated testing. Within the reflow algorithm, it used to first check what the violations are, and it also later helps provides the reasons for changes.
+- **Core Algorithm (`reflow.service.ts`):** Orchestrates the rescheduling of work orders. It utilizes a "Detect and Repair" loop, failing early if fatal violations are discovered.
+- **Constraint Checker (`constraint-checker.ts`):** The source of truth for schedule integrity. It serves as both a sub-module of the reflow engine and a standalone validator for automated testing.
+- **Sequence Preserver (`sequence-preserver.ts`):** Implements topological sorting to ensure that dependency chains are respected while maintaining the relative original order of independent tasks.
+- **Data Utility Hub (`utils/`):** Contains `DateUtils` leveraging `Luxon` for UTC-safe interval math and shift boundary validation.
 
-There are certain scenarios of datasets where the schedule has unfixable violations. When this happens, the reflow algorithm errors out instead of running infinitely, so that proper manual review/intervention can be done.
+---
 
-The scope of the cases covered does not include the case of a group of orders that are dependent on each other and also covering multiple data-centers. This scope is an @upgrade to do later.
+## ⚙️ Reflow Logic & "Cascading" Shifts
 
-To handle the scope of this problem, the reflow algorithm groups orders based on work center. For each center, sequence-preserver.ts is used. This logic will topologically sort dependency groups as well as analyze the original sequencing of the orders. After this, it will output a new Sequence of orders that follows the topological sorting of the dependency groups as well as maintain the original sequence of the independent orders.
-With this new sequencing, the reflow algorithm goes through it in order, ensuring that the current order happens after the previous order. Since original sequencing is preserved, some orders will have to be shifted despite having no original violation due to earlier orders moving up. The reflow correctly outputs "Cascading..." as the reason for these changes.
+To handle complex manufacturing environments, the algorithm groups orders by **Work Center**.
 
-# package.json utility scripts
+1. **Topological Sequencing:** For each center, dependency groups are sorted. Independent orders maintain their original relative sequence to minimize unnecessary schedule churn.
+2. **The "Cascade" Effect:** When an early order is moved (due to a maintenance window or shift change), all subsequent orders in that center’s sequence are evaluated. If an order is shifted solely because its predecessor finished later, the system flags the reason as **"Cascading"**, providing clear traceability for schedule changes.
+3. **Safety Rails:** If the engine detects a scenario that is mathematically impossible to resolve (e.g., circular dependencies), it exits with a fatal error to allow for manual intervention rather than entering an infinite loop.
 
-- data:gen:<scenario> for dataset generation
-- test:<module/file> for running test suites
-
-# Automated Testing
-
-Workflow: create a dataset using data:gen scripts. Then add a test case to test.ts files utilizing those datasets. If a test fails, there is a debugHelper function to generate json files of new violations and reflowed schedule. These are ignored through .gitignore
-
-Since constraint-checker serves as a way to validate the reflow algorithm in the automated tests for large datasets, there are unit tests for constraint-checker to ensure the tests are actually helpful.
+---
 
 ## 🛡️ Constraint Checker Engine
 
 The `ConstraintChecker` is the high-integrity validation core of the scheduling system. It performs a multi-pass audit on reflowed datasets to ensure every Work Order adheres to physical, temporal, and business-logic constraints.
 
 ### 🔍 Validation Suite
-
-The engine categorizes issues into **Violations**, distinguishing between adjustable scheduling conflicts and **Fatal** logical errors that require manual data correction.
 
 | Constraint Type           | Description                                                                                                         | Severity  |
 | :------------------------ | :------------------------------------------------------------------------------------------------------------------ | :-------- |
