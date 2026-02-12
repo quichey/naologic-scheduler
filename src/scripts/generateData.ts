@@ -3,8 +3,19 @@ import type { WorkOrder, WorkCenter, ManufacturingOrder } from '../reflow/types.
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * DataGenerator provides a suite of static methods to generate deterministic
+ * manufacturing datasets. It is designed to simulate various "real-world"
+ * disruptions including maintenance overlaps, shift violations, and
+ * complex dependency chains.
+ */
 export class DataGenerator {
-  // 1. Reusable: Passing parameters instead of hardcoding
+  /**
+   * Generates a standard, balanced dataset with distributed work orders.
+   * * @param orderCount - Total number of production orders to generate.
+   * @param wcCount - Number of work centers to distribute work across.
+   * @returns A complete dataset containing MOs, Centers, and Work Orders.
+   */
   public static createDataset(orderCount: number, wcCount: number = 3) {
     const mos = this.generateMOs(5);
     const centers = this.generateWorkCenters(wcCount);
@@ -15,6 +26,8 @@ export class DataGenerator {
 
   /**
    * Scenario: Work Center maintenance window and a maintenance work order close together.
+   * Validates if the engine can "leapfrog" two distinct downtime blocks.
+   * * @returns A scenario where an order must jump a 2-hour blackout.
    */
   public static createMaintenanceSandwichScenario(): {
     orders: WorkOrder[];
@@ -50,16 +63,14 @@ export class DataGenerator {
 
   /**
    * Scenario: Parallel chains across multiple centers.
-   * - WC-1: A 3-order chain with a 08:00 AM collision.
-   * - WC-2: A 2-order chain starting inside a maintenance window.
-   * - WC-3: A single maintenance order (fixed) and a child WO that overlaps it.
+   * Tests resource isolation and center-specific constraints.
+   * * @returns A dataset with diverse violations across three centers.
    */
   public static createMultiCenterDependencyScenario(): {
     orders: WorkOrder[];
     centers: WorkCenter[];
   } {
     const centers = this.generateWorkCenters(3);
-    const mos = this.generateMOs(3);
     const orders: WorkOrder[] = [];
 
     // --- Center 1: The "Standard" Chain ---
@@ -104,8 +115,8 @@ export class DataGenerator {
 
   /**
    * Scenario: Multi-parent dependency (Convergence).
-   * WO-C depends on BOTH WO-A and WO-B.
-   * Tests if the reflow engine waits for the LATEST parent to finish.
+   * Verifies that children wait for the LATEST parent to complete.
+   * * @returns A scenario where WO-C must wait for the bottleneck (WO-B).
    */
   public static createMultiParentScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
     const centers = this.generateWorkCenters(1);
@@ -137,8 +148,9 @@ export class DataGenerator {
 
   /**
    * Scenario: High-density dependency chains on a single center.
-   * Useful for testing "Time Walking" and "Maintenance Jumping" logic
-   * without cross-center complexity.
+   * Useful for testing "Time Walking" and topological sorting performance.
+   * * @param orderCount - Number of orders in the chain.
+   * @returns A single-center long dependency chain.
    */
   public static createSingleCenterDependencyScenario(orderCount: number): {
     orders: WorkOrder[];
@@ -174,6 +186,7 @@ export class DataGenerator {
 
   /**
    * Scenario: An order collides with a Maintenance window.
+   * * @returns A scenario with a 2-hour maintenance block.
    */
   public static createOrderCollidesWithMaintenance(): {
     orders: WorkOrder[];
@@ -204,8 +217,10 @@ export class DataGenerator {
       centers,
     };
   }
+
   /**
-   * Scenario: Order starts at 06:00 AM, but shift starts at 08:00 AM.
+   * Scenario: Order starts before the shift begins.
+   * * @returns A scenario with a 06:00 AM start time.
    */
   public static createInvalidStartScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
     const centers = this.generateWorkCenters(1);
@@ -220,7 +235,8 @@ export class DataGenerator {
   }
 
   /**
-   * Scenario: Order ends at 07:00 PM, but shift ends at 05:00 PM (17:00).
+   * Scenario: Order ends after the shift finishes.
+   * * @returns A scenario with a 07:00 PM end time.
    */
   public static createInvalidEndScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
     const centers = this.generateWorkCenters(1);
@@ -233,9 +249,10 @@ export class DataGenerator {
 
     return { orders: [order], centers };
   }
+
   /**
-   * Scenario: Order is within shift boundaries, but the window is too small.
-   * Required: 120m. Provided: 60m.
+   * Scenario: Order window is smaller than required duration.
+   * * @returns A scenario with a 60m window for a 120m job.
    */
   public static createInsufficientMinutesScenario(): {
     orders: WorkOrder[];
@@ -253,23 +270,11 @@ export class DataGenerator {
 
     return { orders: [order], centers };
   }
+
   /**
-   * Scenario: The Kitchen Sink (Robustness Test)
-   * * This scenario validates the engine's ability to resolve multiple
-   * overlapping constraints simultaneously across different work centers.
-   * * DISTINCT CASES COVERED:
-   * 1. THE SANDWICH (WC1):
-   * Combines a Static Maintenance Window (08:00-09:00) with a Fixed
-   * Maintenance Work Order (09:00-10:00) to create a single 2-hour block.
-   * * 2. SHIFT BOUNDARY VIOLATIONS (WC2):
-   * Orders are scheduled to start at 06:00 AM, but the Work Center shift
-   * does not begin until 08:00 AM.
-   * * 3. MULTI-PARENT CONVERGENCE (WC2):
-   * Order 'C2-C' depends on both 'C2-A' and 'C2-B'. The engine must
-   * delay 'C2-C' until the LATEST parent finishes.
-   * * 4. DISJOINT MULTI-CENTER SCHEDULING:
-   * Processes two distinct Work Centers in a single pass, ensuring that
-   * violations in WC1 do not bleed into or corrupt the logic for WC2.
+   * Scenario: The Kitchen Sink (Robustness Test).
+   * Simultaneous validation of Sandwich, Shift Boundary, and Convergence logic.
+   * * @returns A multi-center stress scenario.
    */
   public static createComplexRobustnessScenario(): {
     orders: WorkOrder[];
@@ -323,10 +328,13 @@ export class DataGenerator {
       centers,
     };
   }
+
   /**
-   * Scenario: Dynamic Stress Test
-   * Distributes a target number of orders across centers with randomized
-   * chain lengths and maintenance blocks.
+   * Scenario: Dynamic Stress Test.
+   * Generates randomized order distribution with chain breaks.
+   * * @param centerCount - Number of work centers.
+   * @param orderCount - Number of work orders.
+   * @returns A massive randomized dataset.
    */
   public static createDynamicStress(
     centerCount: number,
@@ -373,9 +381,10 @@ export class DataGenerator {
 
     return { orders, centers };
   }
+
   /**
    * Scenario: A perfectly sequenced schedule.
-   * 3 Orders: A -> B -> C, all on the same Work Center, no overlaps.
+   * * @returns A violation-free baseline dataset.
    */
   public static createPerfectScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
     const centers = this.generateWorkCenters(1);
@@ -401,7 +410,8 @@ export class DataGenerator {
 
   /**
    * Scenario: Two Maintenance (fixed) orders overlap.
-   * This is GUARANTEED not fixable because fixed orders cannot be moved.
+   * Unfixable because fixed orders cannot be moved.
+   * * @returns A dataset with an impossible conflict.
    */
   public static createMaintenanceClashScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
     const centers = this.generateWorkCenters(1);
@@ -425,6 +435,29 @@ export class DataGenerator {
     return { orders, centers };
   }
 
+  /**
+   * Scenario: Circular Dependency.
+   * Guaranteed Unfixable (A -> B -> A).
+   * * @returns A dataset that should trigger cycle detection.
+   */
+  public static createCircularScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
+    const centers = this.generateWorkCenters(1);
+    const idA = uuidv4();
+    const idB = uuidv4();
+
+    const orders: WorkOrder[] = [
+      this.createBaseOrder(idA, 'wc-1', [idB]), // A depends on B
+      this.createBaseOrder(idB, 'wc-1', [idA]), // B depends on A
+    ];
+
+    return { orders, centers };
+  }
+
+  /**
+   * Generates dummy WorkCenter data.
+   * * @param count - Number of centers.
+   * @private
+   */
   private static generateWorkCenters(count: number): WorkCenter[] {
     return Array.from({ length: count }).map((_, i) => ({
       docId: `wc-${i + 1}`,
@@ -440,21 +473,13 @@ export class DataGenerator {
     }));
   }
 
-  // 3. Scenario Logic: Guaranteed Unfixable (Circular)
-  public static createCircularScenario(): { orders: WorkOrder[]; centers: WorkCenter[] } {
-    const centers = this.generateWorkCenters(1);
-    const idA = uuidv4();
-    const idB = uuidv4();
-
-    const orders: WorkOrder[] = [
-      this.createBaseOrder(idA, 'wc-1', [idB]), // A depends on B
-      this.createBaseOrder(idB, 'wc-1', [idA]), // B depends on A
-    ];
-
-    return { orders, centers };
-  }
-
-  // Helper to keep code DRY
+  /**
+   * Internal helper to create a base work order with default values.
+   * * @param id - Document ID.
+   * @param wcId - Target Work Center ID.
+   * @param deps - Dependency list.
+   * @private
+   */
   private static createBaseOrder(id: string, wcId: string, deps: string[] = []): WorkOrder {
     return {
       docId: id,
@@ -472,6 +497,11 @@ export class DataGenerator {
     };
   }
 
+  /**
+   * Generates dummy Manufacturing Order data.
+   * * @param count - Number of MOs.
+   * @private
+   */
   private static generateMOs(count: number): ManufacturingOrder[] {
     return Array.from({ length: count }).map((_, i) => ({
       docId: uuidv4(),
@@ -485,6 +515,13 @@ export class DataGenerator {
     }));
   }
 
+  /**
+   * Batch generates work orders with chain logic.
+   * * @param count - Number of orders.
+   * @param mos - MO source pool.
+   * @param centers - WC source pool.
+   * @private
+   */
   private static generateWorkOrders(
     count: number,
     mos: ManufacturingOrder[],
@@ -521,6 +558,9 @@ export class DataGenerator {
   }
 }
 
+/**
+ * CLI Execution Entry Point
+ */
 const run = () => {
   const args = process.argv.slice(2);
   const scenarioArg = args.find((a) => a.startsWith('--scenario='))?.split('=')[1];
@@ -531,6 +571,7 @@ const run = () => {
   let result: any;
   let filename: string;
 
+  // Map arguments to generator scenarios
   if (scenarioArg === 'clash') {
     result = DataGenerator.createMaintenanceClashScenario();
     filename = 'scenario-fatal-clash.json';
@@ -544,7 +585,6 @@ const run = () => {
     filename = 'scenario-perfect.json';
     console.log('✨ Generating Violation-Free Scenario...');
   } else if (scenarioArg === 'maintenance') {
-    // NEW SCENARIO
     result = DataGenerator.createOrderCollidesWithMaintenance();
     filename = 'scenario-maintenance-collision.json';
     console.log('🚧 Generating Maintenance Collision Scenario...');
@@ -557,7 +597,6 @@ const run = () => {
     filename = 'scenario-invalid-end.json';
     console.log('🌃 Generating Invalid End Scenario...');
   } else if (scenarioArg === 'insufficient-time') {
-    // NEW SCENARIO
     result = DataGenerator.createInsufficientMinutesScenario();
     filename = 'scenario-insufficient-time.json';
     console.log('⏳ Generating Insufficient Minutes Scenario...');
@@ -582,24 +621,20 @@ const run = () => {
     result = DataGenerator.createComplexRobustnessScenario();
     filename = 'scenario-robustness-test.json';
     console.log('🧪 Generating Complex Robustness Scenario...');
-    console.log('   - Testing: Sandwich, Shift Boundaries, Convergence, and Center Isolation.');
   } else if (scenarioArg === 'stress') {
     const wcCount = parseInt(args.find((a) => a.startsWith('--centers='))?.split('=')[1] || '10');
     const orderCount = parseInt(
       args.find((a) => a.startsWith('--orders='))?.split('=')[1] || '100',
     );
-
     result = DataGenerator.createDynamicStress(wcCount, orderCount);
     filename = `stress-${orderCount}o-${wcCount}c.json`;
     outputDir = path.join(outputDir, 'large');
-
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
     console.log(`🚀 Stress Test: ${orderCount} orders across ${wcCount} centers.`);
   } else {
-    // Default: Standard dataset
     const orderCount = parseInt(args[0] || '100');
     const wcCount = parseInt(args[1] || '3');
     result = DataGenerator.createDataset(orderCount, wcCount);
-    // TODO: make filename a param
     filename = 'sample-data.json';
     console.log(`✅ Generating standard dataset: ${orderCount} orders, ${wcCount} centers...`);
   }
