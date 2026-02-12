@@ -26,3 +26,12 @@ To handle the scope of this problem, the reflow algorithm groups orders based on
 With this new sequencing, the reflow algorithm goes through it in order, ensuring that the current order happens after the previous order. Since original sequencing is preserved, some orders will have to be shifted despite having no original violation due to earlier orders moving up. The reflow correctly outputs "Cascading..." as the reason for these changes.
 
 # package.json utility scripts
+
+- data:gen:<scenario> for dataset generation
+- test:<module/file> for running test suites
+
+# Automated Testing
+
+Workflow: create a dataset using data:gen scripts. Then add a test case to test.ts files utilizing those datasets. If a test fails, there is a debugHelper function to generate json files of new violations and reflowed schedule. These are ignored through .gitignore
+
+Since constraint-checker serves as a way to validate the reflow algorithm in the automated tests for large datasets, there are unit tests for constraint-checker to ensure the tests are actually helpful.
