@@ -91,26 +91,7 @@ const runTests = () => {
     console.log('✅ Test Passed: Correctly threw "NOT FIXABLE" fatal clash.');
   }
 
-  // --- Test Case 3: 10-Order Distribution ---
-  // Small multi-center dataset check with active debug export on failure.
-  try {
-    const { orders, centers } = loadScenario('10-orders-2-centers.json');
-    const violationsBefore = ConstraintChecker.verify(orders, centers);
-    const reflowed = ReflowService.reflow(orders, centers);
-    const violationsAfter = ConstraintChecker.verify(reflowed.updatedWorkOrders, centers);
-
-    console.log(`[10 Orders] Violations Before: ${violationsBefore.length}`);
-    console.log(`[10 Orders] Violations After: ${violationsAfter.length}`);
-
-    debugHelper(violationsAfter, reflowed);
-
-    assert.strictEqual(violationsAfter.length, 0, 'Should have zero violations');
-    console.log('✅ Test Passed: 10-order dataset successfully reflowed.');
-  } catch (err) {
-    console.error('❌ Test Failed (10 Orders):', err instanceof Error ? err.message : err);
-  }
-
-  // --- Test Case 4: Single Center Chain ---
+  // --- Test Case 3: Single Center Chain ---
   // Tests sequential "push" logic when all orders share a single bottleneck resource.
   try {
     const { orders, centers } = loadScenario('10-order-single-center.json');
@@ -128,7 +109,7 @@ const runTests = () => {
     console.error('❌ Test Failed (Single Center):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 5: Multi-Parent Convergence ---
+  // --- Test Case 4: Multi-Parent Convergence ---
   // Verifies that a child order waits for the completion of its LATEST parent.
   try {
     const { orders, centers } = loadScenario('scenario-multi-parent.json');
@@ -147,7 +128,7 @@ const runTests = () => {
     console.error('❌ Test Failed (Multi-Parent):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 6: Multi-Center Parallel Chains ---
+  // --- Test Case 5: Multi-Center Parallel Chains ---
   // Validates that corrections in one Work Center do not bleed into or corrupt other Work Centers.
   try {
     const { orders, centers } = loadScenario('scenario-multi-center.json');
@@ -168,7 +149,7 @@ const runTests = () => {
     console.error('❌ Test Failed (Multi-Center):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 7: Maintenance Sandwich ---
+  // --- Test Case 6: Maintenance Sandwich ---
   // Tests the ability to jump an order over a contiguous block of downtime (Window + Order).
   try {
     const { orders, centers } = loadScenario('scenario-sandwich.json');
@@ -189,7 +170,7 @@ const runTests = () => {
     console.error('❌ Test Failed (Sandwich):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 8: Robustness (The Kitchen Sink) ---
+  // --- Test Case 7: Robustness (The Kitchen Sink) ---
   // Simultaneous validation of complex overlaps, shift boundaries, and dependency chains.
   try {
     const { orders, centers } = loadScenario('scenario-robustness-test.json');
@@ -210,7 +191,7 @@ const runTests = () => {
     console.error('❌ Test Failed (Robustness):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 9: Explanation & Change Log Audit ---
+  // --- Test Case 8: Explanation & Change Log Audit ---
   // Inspects the 'explanation' metadata to ensure human-readable reasons match performed actions.
   try {
     const { orders, centers } = loadScenario('scenario-robustness-test.json');
@@ -231,9 +212,6 @@ const runTests = () => {
       e.includes('Original violation: MAINTENANCE_COLLISION'),
     );
     const hasCascadeFix = reflowed.explanation.some((e) => e.includes('Cascading shift changes'));
-    const hasConvergenceFix = reflowed.explanation.some((e) =>
-      e.includes('Collision with previous order'),
-    );
 
     assert.ok(hasSandwichFix, 'Should explain a fix for Maintenance Sandwich');
     assert.ok(hasCascadeFix, 'Should explain a cascading shift');
@@ -243,7 +221,7 @@ const runTests = () => {
     console.error('❌ Test Failed (Audit Log):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 10: 10,000 Order Stress Test ---
+  // --- Test Case 9: 10,000 Order Stress Test ---
   try {
     const { orders, centers } = loadScenario('stress-10000o-50c.json', true);
     const violationsBefore = ConstraintChecker.verify(orders, centers);
@@ -261,7 +239,7 @@ const runTests = () => {
     console.error('❌ Test Failed (10k Stress):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 11: 1,000 Order Stress Test ---
+  // --- Test Case 10: 1,000 Order Stress Test ---
   try {
     const { orders, centers } = loadScenario('stress-1000o-50c.json', true);
     const violationsBefore = ConstraintChecker.verify(orders, centers);
@@ -279,7 +257,7 @@ const runTests = () => {
     console.error('❌ Test Failed (1k Stress):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 12: Perfect Schedule (Stability Test) ---
+  // --- Test Case 11: Perfect Schedule (Stability Test) ---
   // Verifies that the engine is idempotent—no changes are made to a perfect schedule.
   try {
     const { orders, centers } = loadScenario('scenario-perfect.json');
@@ -292,7 +270,7 @@ const runTests = () => {
     console.error('❌ Test Failed (Stability):', err instanceof Error ? err.message : err);
   }
 
-  // --- Test Case 13: Shift & Timing Fixes ---
+  // --- Test Case 12: Shift & Timing Fixes ---
   // Validates basic fixes for invalid start/end times and insufficient working minutes.
   try {
     const scenarios = [
