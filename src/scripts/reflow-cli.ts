@@ -35,7 +35,7 @@ const run = () => {
     }
 
     const rawData = JSON.parse(fs.readFileSync(fullInputPath, 'utf-8'));
-    const { workOrders, workCenters, manufacturingOrders } = rawData.data || rawData;
+    const { orders: workOrders, centers: workCenters } = rawData.data || rawData;
 
     console.log(`\n🚀 Initializing Reflow Engine...`);
     console.log(
